@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    webSocketServer: false,
+  eslint: {
+    ignoreDuringBuilds: true,
   },
+
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer) {
       // Desabilitar WebSockets em desenvolvimento

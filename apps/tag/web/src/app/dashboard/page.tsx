@@ -51,16 +51,16 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-dark-900">
-      {/* Header Fixo com Background Verde Sólido */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-primary border-b border-primary-600 shadow-2xl">
+      {/* Header Fixo com Background Desfocado */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shadow-lg">
+            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
               <Tag size={24} weight="duotone" className="text-white" />
             </div>
             <div>
               <h1 className="text-white text-xl font-bold">Granobox Tag</h1>
-              <p className="text-white/90 text-sm">Smart Tag. Smart Food.</p>
+              <p className="text-primary text-sm">Smart Tag. Smart Food.</p>
             </div>
           </div>
           
@@ -69,11 +69,11 @@ export default function DashboardPage() {
             {/* Nome do Estabelecimento */}
             <div className="text-right hidden sm:block">
               <div className="text-white text-sm font-medium">{estabelecimento.nome}</div>
-              <div className="text-white/80 text-xs">{estabelecimento.tipo}</div>
+              <div className="text-dark-400 text-xs">{estabelecimento.tipo}</div>
             </div>
             
             {/* Avatar do Usuário */}
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center cursor-pointer hover:bg-white/30 transition-colors shadow-lg">
+            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-600 transition-colors shadow-lg">
               <span className="text-white text-sm font-bold">{usuario.iniciais}</span>
             </div>
           </div>
