@@ -101,7 +101,7 @@ export default function PreviewEtiquetaPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <a href="/etiquetas/nova" className="p-2 text-dark-400 hover:text-white transition-colors">
@@ -123,7 +123,7 @@ export default function PreviewEtiquetaPage() {
         <div className="max-w-4xl mx-auto space-y-8">
           
           {/* Informações da Etiqueta */}
-          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-700 shadow-2xl">
+          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-800 shadow-2xl">
             <h2 className="text-white text-2xl font-bold mb-6 flex items-center space-x-3">
               <Eye size={28} weight="duotone" className="text-primary" />
               <span>Informações da Etiqueta</span>
@@ -172,14 +172,14 @@ export default function PreviewEtiquetaPage() {
           </div>
 
           {/* Preview da Etiqueta */}
-          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-700 shadow-2xl">
+          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-800 shadow-2xl">
             <h2 className="text-white text-2xl font-bold mb-6 flex items-center space-x-3">
               <Tag size={28} weight="duotone" className="text-primary" />
               <span>Preview da Etiqueta</span>
             </h2>
             
                   {/* Etiqueta Simulada */}
-      <div className="bg-white rounded-2xl p-8 max-w-md mx-auto shadow-2xl border-4 border-dashed border-dark-600">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-auto shadow-2xl border-4 border-dashed border-dark-800">
         {/* Logo/Header da Etiqueta */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-3">
@@ -191,12 +191,12 @@ export default function PreviewEtiquetaPage() {
         </div>
         
         {/* Linha divisória */}
-        <div className="border-t-2 border-dark-600 my-4"></div>
+        <div className="border-t-2 border-dark-800 my-4"></div>
         
         {/* Foto do Produto */}
         {etiqueta.foto && (
           <div className="text-center mb-4">
-            <div className="w-20 h-20 rounded-xl overflow-hidden bg-dark-100 border border-dark-600 mx-auto">
+            <div className="w-20 h-20 rounded-xl overflow-hidden bg-dark-100 border border-dark-800 mx-auto">
               <img 
                 src={etiqueta.foto} 
                 alt={etiqueta.nome}
@@ -235,7 +235,7 @@ export default function PreviewEtiquetaPage() {
               </div>
               
               {/* Linha divisória */}
-              <div className="border-t-2 border-dark-600 my-4"></div>
+              <div className="border-t-2 border-dark-800 my-4"></div>
               
               {/* Footer da Etiqueta */}
               <div className="text-center">
@@ -246,7 +246,7 @@ export default function PreviewEtiquetaPage() {
           </div>
 
           {/* Botões de Ação */}
-          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-700 shadow-2xl">
+          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-800 shadow-2xl">
             <h2 className="text-white text-2xl font-bold mb-6 flex items-center space-x-3">
               <Printer size={28} weight="duotone" className="text-primary" />
               <span>Ações de Impressão</span>
@@ -303,7 +303,7 @@ export default function PreviewEtiquetaPage() {
             </div>
             
             {/* Informações Adicionais */}
-            <div className="mt-8 p-6 bg-dark-700 rounded-2xl border border-dark-600">
+            <div className="mt-8 p-6 bg-dark-700 rounded-2xl border border-dark-800">
               <div className="flex items-center space-x-3 mb-4">
                 <Clock size={24} weight="duotone" className="text-primary" />
                 <h3 className="text-white text-lg font-semibold">Informações da Fila</h3>
@@ -328,7 +328,7 @@ export default function PreviewEtiquetaPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <Tag size={24} weight="duotone" />

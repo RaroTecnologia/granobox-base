@@ -285,7 +285,7 @@ export default function NovaEtiquetaPage() {
     return (
       <div key={categoria.id} className="space-y-3">
         <div
-          className={`bg-dark-800 rounded-3xl p-6 border-2 border-dark-700 hover:border-primary/50 transition-all cursor-pointer group hover:scale-102 ${
+          className={`bg-dark-800 rounded-3xl p-6 border-2 border-dark-800 hover:border-primary/50 transition-all cursor-pointer group hover:scale-102 ${
             hasChildren ? 'hover:bg-dark-750' : ''
           }`}
           onClick={() => {
@@ -348,7 +348,7 @@ export default function NovaEtiquetaPage() {
         {segmentos.map((segmento) => (
           <div
             key={segmento.id}
-            className="bg-dark-800 rounded-3xl p-8 border-2 border-dark-700 hover:border-primary/50 transition-all cursor-pointer group hover:scale-102 flex flex-col items-center justify-center text-center"
+            className="bg-dark-800 rounded-3xl p-8 border-2 border-dark-800 hover:border-primary/50 transition-all cursor-pointer group hover:scale-102 flex flex-col items-center justify-center text-center"
             onClick={() => handleSegmentoSelect(segmento.id)}
           >
             <div className={`w-20 h-20 ${segmento.cor} rounded-full flex items-center justify-center shadow-2xl mx-auto mb-6 group-hover:scale-110 transition-transform`}>
@@ -424,11 +424,11 @@ export default function NovaEtiquetaPage() {
         {itens[selectedCategoria as keyof typeof itens]?.map((item) => (
           <div
             key={item.id}
-            className="bg-dark-800 rounded-3xl p-8 border-2 border-dark-700 hover:border-primary/50 transition-all cursor-pointer group hover:scale-105"
+            className="bg-dark-800 rounded-3xl p-8 border-2 border-dark-800 hover:border-primary/50 transition-all cursor-pointer group hover:scale-105"
             onClick={() => handleItemSelect(item)}
           >
             {/* Foto do Item */}
-            <div className="w-24 h-24 rounded-2xl overflow-hidden bg-dark-700 border-2 border-dark-600 shadow-2xl mx-auto mb-6 group-hover:scale-110 transition-transform">
+            <div className="w-24 h-24 rounded-2xl overflow-hidden bg-dark-700 border-2 border-dark-800 shadow-2xl mx-auto mb-6 group-hover:scale-110 transition-transform">
               {item.foto ? (
                 <>
                   <img 
@@ -531,7 +531,7 @@ export default function NovaEtiquetaPage() {
             value={quantidade}
             onChange={(e) => setQuantidade(e.target.value)}
             min="1"
-            className="w-32 px-4 py-3 bg-dark-700 border border-dark-600 rounded-full text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all mx-auto"
+            className="w-32 px-4 py-3 bg-dark-700 border border-dark-800 rounded-full text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all mx-auto"
           />
         </div>
       </div>
@@ -573,7 +573,7 @@ export default function NovaEtiquetaPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <a href="/etiquetas" className="p-2 text-dark-400 hover:text-white transition-colors">
@@ -596,7 +596,7 @@ export default function NovaEtiquetaPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <Tag size={24} weight="duotone" />

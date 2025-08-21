@@ -18,6 +18,7 @@ import {
   Barcode,
   TrayArrowDown
 } from '@phosphor-icons/react'
+import FooterNavigation from '@/components/FooterNavigation'
 
 interface Categoria {
   id: string
@@ -733,41 +734,8 @@ export default function NovaEtiquetaPage() {
         {renderContent()}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className={`fixed bottom-0 left-0 right-0 z-50 backdrop-blur-sm border-t shadow-2xl ${
-        theme === 'dark' ? 'bg-dark-950/95 border-dark-800' : 'bg-white/95 border-light-200'
-      }`}>
-        <div className="flex justify-around items-center px-6 py-4">
-          <button 
-            onClick={() => navigate('/dashboard')}
-            className={`flex flex-col items-center space-y-1 transition-colors ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'}`}
-          >
-            <Tag size={24} weight="duotone" />
-            <span className="text-xs font-medium">Dash</span>
-          </button>
-          <button 
-            onClick={() => navigate('/etiquetas')}
-            className="flex flex-col items-center space-y-1 text-primary"
-          >
-            <Tag size={24} weight="duotone" />
-            <span className="text-xs font-medium">Etiquetas</span>
-          </button>
-          <button 
-            onClick={() => navigate('/cadastros')}
-            className={`flex flex-col items-center space-y-1 transition-colors ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'}`}
-          >
-            <Package size={24} weight="duotone" />
-            <span className="text-xs font-medium">Cadastros</span>
-          </button>
-          <button 
-            onClick={() => navigate('/configuracoes')}
-            className={`flex flex-col items-center space-y-1 transition-colors ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'}`}
-          >
-            <Tag size={24} weight="duotone" />
-            <span className="text-xs font-medium">Config</span>
-          </button>
-        </div>
-      </nav>
+      {/* Footer Navigation */}
+      <FooterNavigation />
 
       {/* Espaçamento para o bottom navigation */}
       <div className="h-24"></div>

@@ -141,7 +141,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configSistema.nomeEstabelecimento}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, nomeEstabelecimento: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -151,7 +151,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configSistema.cnpj}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, cnpj: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -161,7 +161,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configSistema.endereco}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, endereco: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configSistema.telefone}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, telefone: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -183,7 +183,7 @@ export default function ConfiguracoesPage() {
               type="email"
               value={configSistema.email}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, email: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -192,7 +192,7 @@ export default function ConfiguracoesPage() {
             <select
               value={configSistema.timezone}
               onChange={(e) => setConfigSistema(prev => ({ ...prev, timezone: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             >
               <option value="America/Sao_Paulo">São Paulo (UTC-3)</option>
               <option value="America/Manaus">Manaus (UTC-4)</option>
@@ -235,7 +235,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configUsuario.nome}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, nome: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -245,7 +245,7 @@ export default function ConfiguracoesPage() {
               type="email"
               value={configUsuario.email}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, email: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -255,7 +255,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configUsuario.cargo}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, cargo: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
         </div>
@@ -267,7 +267,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configUsuario.telefone}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, telefone: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -276,7 +276,7 @@ export default function ConfiguracoesPage() {
             <select
               value={configUsuario.tema}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, tema: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             >
               <option value="dark">Escuro</option>
               <option value="light">Claro</option>
@@ -290,7 +290,7 @@ export default function ConfiguracoesPage() {
               id="notificacoes"
               checked={configUsuario.notificacoes}
               onChange={(e) => setConfigUsuario(prev => ({ ...prev, notificacoes: e.target.checked }))}
-              className="w-4 h-4 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+              className="w-4 h-4 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
             />
             <label htmlFor="notificacoes" className="text-white">Receber notificações</label>
           </div>
@@ -298,7 +298,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       {/* Alterar Senha */}
-      <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700">
+      <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800">
         <h3 className="text-white text-lg font-semibold mb-4 flex items-center space-x-2">
           <Key size={20} weight="duotone" className="text-primary" />
           <span>Alterar Senha</span>
@@ -310,7 +310,7 @@ export default function ConfiguracoesPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
-                className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all pr-12"
+                className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all pr-12"
                 placeholder="Digite sua senha atual"
               />
               <button
@@ -327,7 +327,7 @@ export default function ConfiguracoesPage() {
             <label className="block text-sm font-medium text-white mb-2">Nova Senha</label>
             <input
               type="password"
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               placeholder="Digite a nova senha"
             />
           </div>
@@ -336,7 +336,7 @@ export default function ConfiguracoesPage() {
             <label className="block text-sm font-medium text-white mb-2">Confirmar Nova Senha</label>
             <input
               type="password"
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               placeholder="Confirme a nova senha"
             />
           </div>
@@ -391,7 +391,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.nome}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, nome: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -401,7 +401,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.modelo}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, modelo: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -411,7 +411,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.ip}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, ip: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -421,7 +421,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.porta}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, porta: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
         </div>
@@ -432,7 +432,7 @@ export default function ConfiguracoesPage() {
             <select
               value={configImpressora.tipo}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, tipo: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             >
               <option value="zpl">ZPL (Zebra)</option>
               <option value="tspl">TSPL (TSC)</option>
@@ -446,7 +446,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.larguraEtiqueta}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, larguraEtiqueta: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -456,7 +456,7 @@ export default function ConfiguracoesPage() {
               type="text"
               value={configImpressora.alturaEtiqueta}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, alturaEtiqueta: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             />
           </div>
 
@@ -465,7 +465,7 @@ export default function ConfiguracoesPage() {
             <select
               value={configImpressora.densidade}
               onChange={(e) => setConfigImpressora(prev => ({ ...prev, densidade: e.target.value }))}
-              className="w-full px-4 py-3 bg-dark-700 border border-dark-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              className="w-full px-4 py-3 bg-dark-700 border border-dark-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             >
               <option value="203">203 DPI</option>
               <option value="300">300 DPI</option>
@@ -495,7 +495,7 @@ export default function ConfiguracoesPage() {
           <h3 className="text-white text-lg font-semibold mb-4">Canais de Notificação</h3>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
                   <Globe size={20} weight="duotone" className="text-blue-400" />
@@ -509,11 +509,11 @@ export default function ConfiguracoesPage() {
                 type="checkbox"
                 checked={configNotificacoes.email}
                 onChange={(e) => setConfigNotificacoes(prev => ({ ...prev, email: e.target.checked }))}
-                className="w-5 h-5 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+                className="w-5 h-5 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
               />
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
                   <Bell size={20} weight="duotone" className="text-green-400" />
@@ -527,7 +527,7 @@ export default function ConfiguracoesPage() {
                 type="checkbox"
                 checked={configNotificacoes.push}
                 onChange={(e) => setConfigNotificacoes(prev => ({ ...prev, push: e.target.checked }))}
-                className="w-5 h-5 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+                className="w-5 h-5 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
               />
             </div>
           </div>
@@ -537,7 +537,7 @@ export default function ConfiguracoesPage() {
           <h3 className="text-white text-lg font-semibold mb-4">Tipos de Notificação</h3>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center">
                   <Printer size={20} weight="duotone" className="text-purple-400" />
@@ -551,11 +551,11 @@ export default function ConfiguracoesPage() {
                 type="checkbox"
                 checked={configNotificacoes.impressao}
                 onChange={(e) => setConfigNotificacoes(prev => ({ ...prev, impressao: e.target.checked }))}
-                className="w-5 h-5 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+                className="w-5 h-5 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
               />
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
                   <X size={20} weight="duotone" className="text-red-400" />
@@ -569,11 +569,11 @@ export default function ConfiguracoesPage() {
                 type="checkbox"
                 checked={configNotificacoes.erro}
                 onChange={(e) => setConfigNotificacoes(prev => ({ ...prev, erro: e.target.checked }))}
-                className="w-5 h-5 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+                className="w-5 h-5 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
               />
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-700">
+            <div className="flex items-center justify-between p-4 bg-dark-800 rounded-xl border border-dark-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-yellow-500/20 rounded-full flex items-center justify-center">
                   <Queue size={20} weight="duotone" className="text-yellow-400" />
@@ -587,7 +587,7 @@ export default function ConfiguracoesPage() {
                 type="checkbox"
                 checked={configNotificacoes.fila}
                 onChange={(e) => setConfigNotificacoes(prev => ({ ...prev, fila: e.target.checked }))}
-                className="w-5 h-5 text-primary bg-dark-700 border-dark-600 rounded focus:ring-primary focus:ring-2"
+                className="w-5 h-5 text-primary bg-dark-700 border-dark-800 rounded focus:ring-primary focus:ring-2"
               />
             </div>
           </div>
@@ -612,7 +612,7 @@ export default function ConfiguracoesPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
@@ -639,14 +639,14 @@ export default function ConfiguracoesPage() {
           </div>
 
           {/* Conteúdo da Tab */}
-          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-700 shadow-2xl">
+          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-800 shadow-2xl">
             {renderContent()}
           </div>
         </div>
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <Tag size={24} weight="duotone" />

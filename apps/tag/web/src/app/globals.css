@@ -7,8 +7,18 @@
   
   body {
     font-family: var(--font-manrope), Manrope, system-ui, sans-serif;
+  }
+  
+  /* Tema Dark (padrão) */
+  body.dark {
     background-color: #1a1a1a;
     color: #ffffff;
+  }
+  
+  /* Tema Light */
+  body.light {
+    background-color: #fafafa;
+    color: #1a1a1a;
   }
 }
 

@@ -177,7 +177,7 @@ export default function FilaImpressaoPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <a href="/etiquetas" className="p-2 text-dark-400 hover:text-white transition-colors">
@@ -219,7 +219,7 @@ export default function FilaImpressaoPage() {
           
           {/* Estatísticas da Fila */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl">
+            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
                   <Queue size={24} weight="duotone" className="text-blue-400" />
@@ -231,7 +231,7 @@ export default function FilaImpressaoPage() {
               </div>
             </div>
             
-            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl">
+            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-yellow-500/20 rounded-full flex items-center justify-center">
                   <Clock size={24} weight="duotone" className="text-yellow-400" />
@@ -245,7 +245,7 @@ export default function FilaImpressaoPage() {
               </div>
             </div>
             
-            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl">
+            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center">
                   <Printer size={24} weight="duotone" className="text-blue-400" />
@@ -259,7 +259,7 @@ export default function FilaImpressaoPage() {
               </div>
             </div>
             
-            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl">
+            <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl">
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center">
                   <Check size={24} weight="duotone" className="text-green-400" />
@@ -275,7 +275,7 @@ export default function FilaImpressaoPage() {
           </div>
 
           {/* Lista da Fila */}
-          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-700 shadow-2xl">
+          <div className="bg-dark-800 rounded-3xl p-8 border border-dark-800 shadow-2xl">
             <h2 className="text-white text-2xl font-bold mb-6 flex items-center space-x-3">
               <Queue size={28} weight="duotone" className="text-primary" />
               <span>Etiquetas na Fila</span>
@@ -294,7 +294,7 @@ export default function FilaImpressaoPage() {
                 {fila.map((etiqueta) => (
                   <div
                     key={etiqueta.id}
-                    className="bg-dark-700 rounded-2xl p-6 border border-dark-600 hover:border-primary/50 transition-all"
+                    className="bg-dark-700 rounded-2xl p-6 border border-dark-800 hover:border-primary/50 transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-4 flex-1">
@@ -399,7 +399,7 @@ export default function FilaImpressaoPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <Tag size={24} weight="duotone" />

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Eye, EyeSlash, Envelope, Lock, User } from '@phosphor-icons/react'
 import { useRouter } from 'next/navigation'
 
@@ -29,7 +30,10 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           {/* Logo */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-10 relative">
+            <div className="absolute top-0 right-0">
+              <ThemeToggle />
+            </div>
             <div className="w-20 h-20 bg-primary rounded-full mx-auto mb-6 flex items-center justify-center shadow-2xl">
               <User size={40} weight="duotone" className="text-white" />
             </div>
@@ -55,7 +59,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-14 pr-4 py-4 bg-dark-800 border border-dark-700 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-base"
+                  className="w-full pl-14 pr-4 py-4 bg-dark-800 border border-dark-800 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-base"
                   placeholder="seu@email.com"
                   required
                 />
@@ -78,7 +82,7 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-14 pr-14 py-4 bg-dark-800 border border-dark-700 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-base"
+                  className="w-full pl-14 pr-14 py-4 bg-dark-800 border border-dark-800 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-base"
                   placeholder="••••••••"
                   required
                 />
@@ -131,7 +135,7 @@ export default function LoginPage() {
       </div>
 
       {/* Footer Full-Width */}
-      <footer className="w-full bg-dark-800 border-t border-dark-700 py-4 px-6">
+      <footer className="w-full bg-dark-800 border-t border-dark-800 py-4 px-6">
         <div className="flex justify-between items-center text-sm max-w-6xl mx-auto">
           <div className="text-dark-300 leading-relaxed">
             © 2025 Wdezoito Tecnologia.<br />

@@ -135,7 +135,7 @@ export default function EtiquetasPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo com Background Desfocado */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
@@ -158,7 +158,7 @@ export default function EtiquetasPage() {
       {/* Conteúdo Principal */}
       <main className="pt-32 px-6 py-6 space-y-6">
         {/* Filtros e Busca */}
-        <div className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl">
+        <div className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Busca */}
             <div className="flex-1 relative">
@@ -172,7 +172,7 @@ export default function EtiquetasPage() {
                 placeholder="Buscar por nome ou código..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-dark-700 border border-dark-600 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+                className="w-full pl-10 pr-4 py-3 bg-dark-700 border border-dark-800 rounded-full text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
               />
             </div>
 
@@ -195,13 +195,13 @@ export default function EtiquetasPage() {
           </div>
 
           {/* Ordenação */}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-dark-700">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-dark-800">
             <div className="flex items-center space-x-4">
               <span className="text-dark-400 text-sm">Ordenar por:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-dark-700 border border-dark-600 rounded-full px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="bg-dark-700 border border-dark-800 rounded-full px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="data">Data</option>
                 <option value="nome">Nome</option>
@@ -226,7 +226,7 @@ export default function EtiquetasPage() {
         {/* Lista de Etiquetas */}
         <div className="space-y-3">
           {sortedEtiquetas.map((etiqueta) => (
-            <div key={etiqueta.id} className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl hover:border-dark-600 transition-all">
+            <div key={etiqueta.id} className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl hover:border-dark-800 transition-all">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
                   <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
@@ -286,7 +286,7 @@ export default function EtiquetasPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <ChartLine size={24} weight="duotone" />

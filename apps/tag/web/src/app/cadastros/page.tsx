@@ -244,8 +244,8 @@ export default function CadastrosPage() {
     return (
       <div key={categoria.id} className="space-y-2">
         <div
-          className={`bg-dark-800 rounded-2xl p-4 border border-dark-700 shadow-xl hover:border-primary/50 transition-all cursor-pointer group ${
-            hasChildren ? 'hover:bg-dark-750' : ''
+          className={`bg-dark-800 rounded-2xl p-4 border border-dark-800 shadow-xl hover:border-primary/50 transition-all cursor-pointer group ${
+            hasChildren ? 'hover:bg-dark-700' : ''
           }`}
           onClick={() => {
             if (hasChildren) {
@@ -352,7 +352,7 @@ export default function CadastrosPage() {
         {segmentos.map((segmento) => (
           <div
             key={segmento.id}
-            className="bg-dark-800 rounded-2xl p-6 border border-dark-700 shadow-xl hover:border-primary/50 transition-all cursor-pointer group"
+            className="bg-dark-800 rounded-2xl p-6 border border-dark-800 shadow-xl hover:border-primary/50 transition-all cursor-pointer group"
             onClick={() => setSelectedSegmento(segmento.id)}
           >
             <div className="flex items-center justify-between mb-4">
@@ -445,12 +445,12 @@ export default function CadastrosPage() {
         {itens[selectedCategoria as keyof typeof itens]?.map((item) => (
           <div
             key={item.id}
-            className="bg-dark-800 rounded-2xl p-4 border border-dark-700 shadow-lg hover:border-primary/50 transition-all"
+            className="bg-dark-800 rounded-2xl p-4 border border-dark-800 shadow-lg hover:border-primary/50 transition-all"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 {/* Foto do Item */}
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-dark-700 border border-dark-600">
+                <div className="w-16 h-16 rounded-xl overflow-hidden bg-dark-700 border border-dark-800">
                   {item.foto ? (
                     <>
                       <img 
@@ -513,7 +513,7 @@ export default function CadastrosPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       {/* Header Fixo */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-600 shadow-2xl">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-b border-dark-800 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
@@ -535,7 +535,7 @@ export default function CadastrosPage() {
       </main>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-600 shadow-2xl">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-dark-950/95 backdrop-blur-sm border-t border-dark-800 shadow-2xl">
         <div className="flex justify-around items-center px-6 py-4">
           <a href="/dashboard" className="flex flex-col items-center space-y-1 text-dark-400 hover:text-white transition-colors">
             <Tag size={24} weight="duotone" />

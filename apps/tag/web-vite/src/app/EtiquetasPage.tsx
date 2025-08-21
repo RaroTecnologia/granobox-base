@@ -22,6 +22,7 @@ import {
   Gear 
 } from '@phosphor-icons/react'
 import { useState } from 'react'
+import FooterNavigation from '@/components/FooterNavigation'
 
 export default function EtiquetasPage() {
   const { theme } = useTheme()
@@ -678,40 +679,7 @@ export default function EtiquetasPage() {
       )}
 
       {/* Footer Navigation */}
-      <nav className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-t fixed bottom-0 left-0 right-0 px-4 py-3`}>
-        <div className="flex items-center justify-around">
-          <a href="/dashboard" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <ChartLine size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Dash</span>
-          </a>
-          <a href="/etiquetas" className={`flex flex-col items-center space-y-1 text-primary`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Package size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Etiquetas</span>
-          </a>
-          <a href="/cadastros" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Package size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Cadastros</span>
-          </a>
-          <a href="/alertas" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Warning size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Alertas</span>
-          </a>
-          <a href="/configuracoes" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Gear size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Config</span>
-          </a>
-        </div>
-      </nav>
+      <FooterNavigation />
     </div>
   )
 }

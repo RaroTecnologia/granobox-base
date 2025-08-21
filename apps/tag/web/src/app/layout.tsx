@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Manrope } from 'next/font/google'
 import './globals.css'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 
-const manrope = Manrope({ 
+const manrope = Manrope({
   subsets: ['latin'],
   variable: '--font-manrope',
   display: 'swap',
@@ -21,11 +22,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className={manrope.variable}>
-      <body 
+      <body
         className={`${manrope.className} antialiased`}
         suppressHydrationWarning={true}
       >
-        {children}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   )

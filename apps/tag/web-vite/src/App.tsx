@@ -12,6 +12,7 @@ import FilaPage from '@/app/FilaPage'
 import AlertasPage from '@/app/AlertasPage'
 import EtiquetaDetalhesPage from '@/app/EtiquetaDetalhesPage'
 import CadastroItemPage from '@/app/CadastroItemPage'
+import PerfilPage from '@/app/PerfilPage'
 
 const router = createBrowserRouter([
   {
@@ -37,6 +38,10 @@ const router = createBrowserRouter([
   {
     path: "/configuracoes",
     element: <ConfiguracoesPage />,
+  },
+  {
+    path: "/perfil",
+    element: <PerfilPage />,
   },
   {
     path: "/preview",

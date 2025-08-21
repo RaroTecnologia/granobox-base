@@ -1,11 +1,30 @@
 import { useTheme } from '@/contexts/ThemeContext'
-import { ThemeToggle } from '@/components/ThemeToggle'
-import { Tag, Plus, Printer, Package, ChartLine, Eye, Gear, Warning, XCircle, Info, Trophy, Target } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { Tag, Plus, Printer, Package, ChartLine, Eye, Gear, Warning, XCircle, Info, Trophy, Target, User, SignOut } from '@phosphor-icons/react'
+import { useState, useEffect } from 'react'
+import FooterNavigation from '@/components/FooterNavigation'
 
 export default function DashboardPage() {
-  const { theme } = useTheme()
+  const { theme, toggleTheme } = useTheme()
   const [showModal, setShowModal] = useState(false)
+  const [showUserPopover, setShowUserPopover] = useState(false)
+
+  // Fechar popover quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element
+      if (!target.closest('.user-popover')) {
+        setShowUserPopover(false)
+      }
+    }
+
+    if (showUserPopover) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showUserPopover])
 
   const stats = {
     totalEtiquetas: 1247,
@@ -67,8 +86,13 @@ export default function DashboardPage() {
           
           {/* Estabelecimento e Usuário */}
           <div className="flex items-center space-x-4">
-            {/* Toggle de Tema */}
-            <ThemeToggle />
+            {/* Botão de Configurações */}
+            <a 
+              href="/configuracoes"
+              className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'}`}
+            >
+              <Gear size={24} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
+            </a>
             
             {/* Nome do Estabelecimento */}
             <div className="text-right hidden sm:block">
@@ -76,9 +100,82 @@ export default function DashboardPage() {
               <div className={`text-xs ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>{estabelecimento.tipo}</div>
             </div>
             
-            {/* Avatar do Usuário */}
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-600 transition-colors shadow-lg">
-              <span className="text-white text-sm font-bold">{usuario.iniciais}</span>
+            {/* Avatar do Usuário com Popover */}
+            <div className="relative user-popover">
+              <div 
+                className="w-10 h-10 bg-primary rounded-full flex items-center justify-center cursor-pointer hover:bg-primary-600 transition-colors shadow-lg"
+                onClick={() => setShowUserPopover(!showUserPopover)}
+              >
+                <span className="text-white text-sm font-bold">{usuario.iniciais}</span>
+              </div>
+              
+              {/* Popover do Usuário */}
+              {showUserPopover && (
+                <div className={`absolute right-0 top-12 w-64 rounded-xl border shadow-2xl z-50 ${
+                  theme === 'dark' 
+                    ? 'bg-dark-800 border-dark-700' 
+                    : 'bg-white border-gray-200'
+                }`}>
+                  {/* Header do Popover */}
+                  <div className={`p-4 border-b ${
+                    theme === 'dark' ? 'border-dark-700' : 'border-gray-200'
+                  }`}>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center">
+                        <span className="text-white text-sm font-bold">{usuario.iniciais}</span>
+                      </div>
+                      <div>
+                        <div className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                          {usuario.nome}
+                        </div>
+                        <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-gray-500'}`}>
+                          Administrador
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Opções do Usuário */}
+                  <div className="p-2">
+                    <a 
+                      href="/perfil"
+                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                        theme === 'dark' 
+                          ? 'hover:bg-dark-700 text-dark-300' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <User size={20} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-gray-600'} />
+                      <span>Meu Perfil</span>
+                    </a>
+                    
+                    <a 
+                      href="/configuracoes"
+                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                        theme === 'dark' 
+                          ? 'hover:bg-dark-700 text-dark-300' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      <Gear size={20} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-gray-600'} />
+                      <span>Configurações</span>
+                    </a>
+                    
+                    <div className={`border-t my-2 ${
+                      theme === 'dark' ? 'border-dark-700' : 'border-gray-200'
+                    }`}></div>
+                    
+                    <button className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                      theme === 'dark' 
+                        ? 'hover:bg-red-900/20 text-red-400' 
+                        : 'hover:bg-red-50 text-red-600'
+                    }`}>
+                      <SignOut size={20} weight="duotone" />
+                      <span>Sair</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -149,6 +246,31 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Ações Rápidas */}
+        <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-800' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
+          <h2 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>Ações Rápidas</h2>
+          <div className="grid grid-cols-2 gap-4">
+            {quickActions.map((action, index) => {
+              const isPrimary = action.color === 'bg-primary';
+              
+              return (
+                <a
+                  key={index}
+                  href={action.href}
+                  className={`${
+                    isPrimary 
+                      ? 'bg-primary' 
+                      : theme === 'dark' ? 'bg-dark-700' : 'bg-dark-500'
+                  } rounded-2xl p-4 flex flex-col items-center justify-center transition-all duration-200 hover:scale-102 shadow-lg`}
+                >
+                  <action.icon size={32} weight="duotone" className="text-white mb-2" />
+                  <span className="text-white text-sm font-medium text-center">{action.label}</span>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+
         {/* KPIs Gamificados */}
         <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
           <div className="flex items-center justify-between mb-6">
@@ -201,31 +323,6 @@ export default function DashboardPage() {
                 Próximo: {stats.proximoNivel}
               </span>
             </div>
-          </div>
-        </div>
-
-        {/* Ações Rápidas */}
-        <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-800' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
-          <h2 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>Ações Rápidas</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {quickActions.map((action, index) => {
-              const isPrimary = action.color === 'bg-primary';
-              
-              return (
-                <a
-                  key={index}
-                  href={action.href}
-                  className={`${
-                    isPrimary 
-                      ? 'bg-primary' 
-                      : theme === 'dark' ? 'bg-dark-700' : 'bg-dark-500'
-                  } rounded-2xl p-4 flex flex-col items-center justify-center transition-all duration-200 hover:scale-102 shadow-lg`}
-                >
-                  <action.icon size={32} weight="duotone" className="text-white mb-2" />
-                  <span className="text-white text-sm font-medium text-center">{action.label}</span>
-                </a>
-              );
-            })}
           </div>
         </div>
 
@@ -344,40 +441,7 @@ export default function DashboardPage() {
       )}
 
       {/* Footer Navigation */}
-      <nav className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-t fixed bottom-0 left-0 right-0 px-4 py-3`}>
-        <div className="flex items-center justify-around">
-          <a href="/dashboard" className={`flex flex-col items-center space-y-1 text-primary`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <ChartLine size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Dash</span>
-          </a>
-          <a href="/etiquetas" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Package size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Etiquetas</span>
-          </a>
-          <a href="/cadastros" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Package size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Cadastros</span>
-          </a>
-          <a href="/alertas" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Warning size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Alertas</span>
-          </a>
-          <a href="/configuracoes" className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
-            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center">
-              <Gear size={16} weight="duotone" className="text-primary" />
-            </div>
-            <span className="text-xs">Config</span>
-          </a>
-        </div>
-      </nav>
+      <FooterNavigation />
 
       {/* Espaçamento para o bottom navigation */}
       <div className="h-24"></div>
