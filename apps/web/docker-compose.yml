@@ -1,0 +1,35 @@
+# Docker Compose para desenvolvimento local do Granobox
+version: '3.8'
+
+services:
+  # Aplicação Granobox
+  granobox-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://granobox:granobox123@granobox-db:5432/granobox
+      - NEXTAUTH_SECRET=desenvolvimento-secret-key-super-segura
+      - NEXTAUTH_URL=http://localhost:3000
+    depends_on:
+      - granobox-db
+    restart: unless-stopped
+
+  # Banco de dados PostgreSQL
+  granobox-db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=granobox
+      - POSTGRES_USER=granobox
+      - POSTGRES_PASSWORD=granobox123
+    volumes:
+      - granobox-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  granobox-db-data: 

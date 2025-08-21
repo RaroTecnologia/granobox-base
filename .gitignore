@@ -1,0 +1,16 @@
+node_modules
+
+# Electron artifacts
+apps/web/desktop-app/dist/
+apps/web/desktop-printer-app/dist/
+*.dmg
+*.app
+*.asar
+
+# Electron artifacts
+apps/web/desktop-app/dist/**
+apps/web/desktop-printer-app/dist/**
+*.dmg
+*.app
+*.asar
+

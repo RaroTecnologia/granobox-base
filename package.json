@@ -1,0 +1,23 @@
+{
+  "name": "granobox-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "mobile": "cd apps/mobile && npx @expo/cli start",
+    "mobile:android": "cd apps/mobile && npx @expo/cli start --android",
+    "mobile:ios": "cd apps/mobile && npx @expo/cli start --ios",
+    "mobile:web": "cd apps/mobile && npx @expo/cli start --web",
+    "web": "cd apps/web && npm run dev",
+    "install:all": "npm install && cd apps/mobile && npm install && cd ../web && npm install"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+} 

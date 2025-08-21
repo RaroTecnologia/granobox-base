@@ -1,0 +1,18 @@
+{
+  "name": "granobox-print-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agente local simplificado para impressão (TCP 9100) de ZPL/ESC-POS",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@serialport/stream": "^13.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "serialport": "^13.0.0"
+  }
+}

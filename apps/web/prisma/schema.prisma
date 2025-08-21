@@ -1,0 +1,512 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Ingrediente {
+  id            String                @id @default(cuid())
+  organizacaoId String                // NOVO
+  nome          String
+  unidade       String
+  estoqueAtual  Float
+  estoqueMinimo Float
+  custoUnitario Float @default(0)
+  fornecedor    String?
+  dataValidade  DateTime?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  
+  organizacao   Organizacao           @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  itensReceita  ItemReceita[]
+  movimentacoes MovimentacaoEstoque[]
+  itensListaCompras ItemListaCompras[]
+
+  @@map("ingredientes")
+}
+
+model ItemListaCompras {
+  id            String      @id @default(cuid())
+  ingredienteId String
+  nome          String
+  quantidade    Float
+  unidade       String
+  comprado      Boolean     @default(false)
+  observacoes   String?
+  adicionadoEm  DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  ingrediente   Ingrediente @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+
+  @@map("itens_lista_compras")
+}
+
+model Receita {
+  id              String         @id @default(cuid())
+  organizacaoId   String         // NOVO
+  nome            String
+  descricao       String?
+  categoria       String
+  rendimento      Int
+  unidadeRendimento String      @default("unidades")
+  tempoPreparo    Int
+  custoTotal      Float
+  precoVenda      Float
+  instrucoes      String?
+  ativo           Boolean        @default(true)
+  dataCriacao     DateTime       @default(now())
+  dataAtualizacao DateTime       @updatedAt
+  pesoUnitario    Float?
+  tamanhoForma    String?
+  pesoTotalBase   Float?
+  sistemaCalculo  String         @default("peso")
+  
+  organizacao     Organizacao    @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  itensPedido     ItemPedido[]
+  itensProducao   ItemProducao[]
+  ingredientes    ItemReceita[]
+  etapas          EtapaReceita[]
+  produtosProntos ProdutoPronto[]
+  manipulados     Manipulado[]
+
+  @@map("receitas")
+}
+
+model ItemReceita {
+  id                String      @id @default(cuid())
+  receitaId         String
+  ingredienteId     String
+  quantidade        Float
+  isIngredienteBase Boolean     @default(false)
+  ingrediente       Ingrediente @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+  receita           Receita     @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+
+  @@map("itens_receita")
+}
+
+model Cliente {
+  id             String    @id @default(cuid())
+  organizacaoId  String    // NOVO
+  nome           String
+  email          String?
+  telefone       String?
+  endereco       Json?
+  dataNascimento DateTime?
+  ativo          Boolean   @default(true)
+  dataCadastro   DateTime  @default(now())
+  totalCompras   Float     @default(0)
+  
+  organizacao    Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  pedidos        Pedido[]
+
+  @@map("clientes")
+}
+
+model Pedido {
+  id              String       @id @default(cuid())
+  organizacaoId   String       // NOVO
+  clienteId       String?
+  subtotal        Float
+  desconto        Float        @default(0)
+  total           Float
+  status          String
+  tipo            String
+  formaPagamento  String?
+  observacoes     String?
+  dataHoraPedido  DateTime     @default(now())
+  dataHoraEntrega DateTime?
+  
+  organizacao     Organizacao  @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  itens           ItemPedido[]
+  cliente         Cliente?     @relation(fields: [clienteId], references: [id])
+
+  @@map("pedidos")
+}
+
+model ItemPedido {
+  id            String  @id @default(cuid())
+  pedidoId      String
+  receitaId     String
+  quantidade    Int
+  precoUnitario Float
+  subtotal      Float
+  pedido        Pedido  @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  receita       Receita @relation(fields: [receitaId], references: [id])
+
+  @@map("itens_pedido")
+}
+
+model PlanoProducao {
+  id              String         @id @default(cuid())
+  organizacaoId   String         // NOVO
+  data            DateTime
+  status          String
+  observacoes     String?
+  dataCriacao     DateTime       @default(now())
+  dataAtualizacao DateTime       @updatedAt
+  
+  organizacao     Organizacao    @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  itens           ItemProducao[]
+
+  @@map("planos_producao")
+}
+
+model ItemProducao {
+  id              String        @id @default(cuid())
+  planoProducaoId String
+  receitaId       String
+  quantidade      Int
+  planoProducao   PlanoProducao @relation(fields: [planoProducaoId], references: [id], onDelete: Cascade)
+  receita         Receita       @relation(fields: [receitaId], references: [id])
+
+  @@map("itens_producao")
+}
+
+model MovimentacaoEstoque {
+  id               String      @id @default(cuid())
+  ingredienteId    String
+  tipo             String
+  quantidade       Float
+  motivo           String
+  dataMovimentacao DateTime    @default(now())
+  usuario          String?
+  ingrediente      Ingrediente @relation(fields: [ingredienteId], references: [id])
+
+  @@map("movimentacoes_estoque")
+}
+
+model ConfiguracaoImpressora {
+  id           String   @id @default(cuid())
+  organizacaoId String  // NOVO
+  nome         String
+  tipo         String
+  interface    String
+  largura      Int      @default(48)
+  ativa        Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  configuracao String?
+  usarAgent    Boolean  @default(false)
+  agentProfile String?
+  
+  organizacao  Organizacao @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+
+  @@map("configuracoes_impressora")
+}
+
+model EtapaReceita {
+  id           String  @id @default(cuid())
+  receitaId    String
+  nome         String
+  ordem        Int
+  descricao    String?
+  tempoMin     Int?
+  tempoMax     Int?
+  temperatura  Float?
+  umidade      Float?
+  observacoes  String?
+  receita      Receita @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+
+  @@map("etapas_receita")
+}
+
+model TipoManipulado {
+  id                String                      @id @default(cuid())
+  organizacaoId     String
+  nome              String
+  descricao         String?
+  categoria         String                      // "massa", "creme", "calda", "pasta", "recheio", "cobertura"
+  unidade           String                      @default("kg")
+  estoqueMinimo     Float                       @default(0)
+  custoUnitario     Float                       @default(0)
+  conservacaoRecomendada StatusConservacaoProduto   // TEMPERATURA_AMBIENTE, CONGELADO, RESFRIADO
+  validadeTemperaturaAmbiente Int?              // Validade em minutos para temperatura ambiente
+  validadeRefrigerado Int?                      // Validade em minutos para refrigerado
+  validadeCongelado Int?                        // Validade em minutos para congelado
+  instrucoes        String?
+  ativo             Boolean                     @default(true)
+  dataCriacao       DateTime                    @default(now())
+  dataAtualizacao   DateTime                    @updatedAt
+  
+  organizacao       Organizacao                 @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  manipulados       Manipulado[]
+
+  @@map("tipos_manipulado")
+}
+
+model Manipulado {
+  id                String                      @id @default(cuid())
+  organizacaoId     String
+  nome              String
+  descricao         String?
+  categoria         String                      // "massa", "creme", "calda", "pasta"
+  unidade           String                      @default("kg")
+  quantidade        Float                       @default(0)
+  estoqueMinimo     Float                       @default(0)
+  custoUnitario     Float                       @default(0)
+  conservacaoRecomendada StatusConservacaoProduto   // TEMPERATURA_AMBIENTE, CONGELADO, RESFRIADO
+  dataManipulacao   DateTime                    @default(now())
+  validadeTemperaturaAmbiente Int?              // Validade em minutos para temperatura ambiente
+  validadeRefrigerado Int?                      // Validade em minutos para refrigerado
+  validadeCongelado Int?                        // Validade em minutos para congelado
+  instrucoes        String?
+  ativo             Boolean                     @default(true)
+  dataCriacao       DateTime                    @default(now())
+  dataAtualizacao   DateTime                    @updatedAt
+  
+  organizacao       Organizacao                 @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  receita           Receita?                    @relation(fields: [receitaId], references: [id])
+  receitaId         String?
+  tipoManipuladoId  String?                     // Referência ao tipo de manipulado
+  tipoManipulado    TipoManipulado?             @relation(fields: [tipoManipuladoId], references: [id])
+  usuarioCriacao    String?                     // ID do usuário que criou o manipulado
+  usuario           Usuario?                    @relation(fields: [usuarioCriacao], references: [id])
+  movimentacoes     MovimentacaoManipulado[]
+
+  @@map("manipulados")
+}
+
+model MovimentacaoManipulado {
+  id              String        @id @default(cuid())
+  manipuladoId    String
+  tipo            String        // "entrada", "saida", "ajuste", "vencimento", "transferencia"
+  quantidade      Float
+  quantidadeAnterior Float
+  quantidadeNova  Float
+  motivo          String
+  dataMovimento   DateTime      @default(now())
+  usuarioId       String?       // ID do usuário que fez a movimentação
+  usuario         Usuario?      @relation(fields: [usuarioId], references: [id])
+  observacoes     String?
+  manipulado      Manipulado    @relation(fields: [manipuladoId], references: [id], onDelete: Cascade)
+
+  @@map("movimentacoes_manipulado")
+}
+
+model ProdutoPronto {
+  id                String                      @id @default(cuid())
+  organizacaoId     String                      // NOVO
+  receitaId         String
+  lote              String
+  quantidade        Int
+  unidade           String                      @default("unidade")
+  statusConservacao StatusConservacaoProduto
+  dataProducao      DateTime                    @default(now())
+  dataValidade      DateTime
+  observacoes       String?
+  ativo             Boolean                     @default(true)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  
+  organizacao       Organizacao                 @relation(fields: [organizacaoId], references: [id], onDelete: Cascade) // NOVO
+  receita           Receita                     @relation(fields: [receitaId], references: [id])
+  movimentacoes     MovimentacaoProdutoPronto[]
+
+  @@map("produtos_prontos")
+}
+
+model MovimentacaoProdutoPronto {
+  id              String        @id @default(cuid())
+  produtoProntoId String
+  tipo            String        // "entrada", "saida", "ajuste", "vencimento"
+  quantidade      Int
+  motivo          String
+  dataMovimento   DateTime      @default(now())
+  usuario         String?
+  observacoes     String?
+  produtoPronto   ProdutoPronto @relation(fields: [produtoProntoId], references: [id], onDelete: Cascade)
+
+  @@map("movimentacoes_produto_pronto")
+}
+
+// ===== SISTEMA DE GESTÃO DE ORGANIZAÇÕES =====
+
+model Organizacao {
+  id                String           @id @default(cuid())
+  nome              String
+  razaoSocial       String?
+  documento         String?          @unique // CPF ou CNPJ
+  email             String
+  telefone          String?
+  endereco          Json?
+  logo              String?
+  dominio           String?          @unique // subdomain.granobox.com
+  ativo             Boolean          @default(true)
+  dataCadastro      DateTime         @default(now())
+  dataAtualizacao   DateTime         @updatedAt
+  
+  // Relacionamentos
+  usuarios          Usuario[]
+  assinatura        Assinatura?
+  configuracoes     ConfiguracaoOrganizacao?
+  
+  // Dados do negócio (multi-tenancy)
+  ingredientes      Ingrediente[]
+  receitas          Receita[]
+  clientes          Cliente[]
+  pedidos           Pedido[]
+  planosProducao    PlanoProducao[]
+  tiposManipulado   TipoManipulado[]
+  manipulados       Manipulado[]
+  produtosProntos   ProdutoPronto[]
+  configuracoesImpressora ConfiguracaoImpressora[]
+
+  @@map("organizacoes")
+}
+
+model Plano {
+  id                String       @id @default(cuid())
+  nome              String       // "Básico", "Profissional", "Enterprise"
+  descricao         String?
+  preco             Float
+  moeda             String       @default("BRL")
+  periodo           String       @default("mensal") // "mensal", "anual"
+  recursos          Json         // {"usuarios": 5, "receitas": 100, "backup": true}
+  ativo             Boolean      @default(true)
+  dataCriacao       DateTime     @default(now())
+  
+  assinaturas       Assinatura[]
+
+  @@map("planos")
+}
+
+model Assinatura {
+  id                String       @id @default(cuid())
+  organizacaoId     String       @unique
+  planoId           String
+  status            String       @default("ativa") // "ativa", "cancelada", "suspensa", "vencida"
+  dataInicio        DateTime     @default(now())
+  dataFim           DateTime?
+  dataCancelamento  DateTime?
+  valor             Float
+  moeda             String       @default("BRL")
+  observacoes       String?
+  dataCriacao       DateTime     @default(now())
+  dataAtualizacao   DateTime     @updatedAt
+  
+  organizacao       Organizacao  @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  plano             Plano        @relation(fields: [planoId], references: [id])
+  faturas           Fatura[]
+
+  @@map("assinaturas")
+}
+
+model Fatura {
+  id                String       @id @default(cuid())
+  assinaturaId      String
+  numero            String       @unique
+  valor             Float
+  moeda             String       @default("BRL")
+  status            String       @default("pendente") // "pendente", "paga", "vencida", "cancelada"
+  dataVencimento    DateTime
+  dataPagamento     DateTime?
+  metodoPagamento   String?
+  observacoes       String?
+  dataCriacao       DateTime     @default(now())
+  
+  assinatura        Assinatura   @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
+
+  @@map("faturas")
+}
+
+model Usuario {
+  id                String       @id @default(cuid())
+  organizacaoId     String?      // Opcional para usuários admin do sistema
+  nome              String
+  email             String
+  senha             String?      // Hash da senha
+  telefone          String?
+  cargo             String?
+  avatar            String?
+  ativo             Boolean      @default(true)
+  ultimoAcesso      DateTime?
+  dataCadastro      DateTime     @default(now())
+  dataAtualizacao   DateTime     @updatedAt
+  
+  organizacao       Organizacao? @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  permissoes        PermissaoUsuario[]
+  
+  // Relacionamentos com manipulação
+  manipulados       Manipulado[]
+  movimentacoesManipulado MovimentacaoManipulado[]
+
+  @@unique([email, organizacaoId])
+  @@map("usuarios")
+}
+
+model Permissao {
+  id                String       @id @default(cuid())
+  nome              String       @unique // "admin", "gerente", "operador", "visualizador"
+  descricao         String?
+  recursos          Json         // {"receitas": ["read", "write"], "pedidos": ["read"]}
+  ativo             Boolean      @default(true)
+  
+  usuarios          PermissaoUsuario[]
+
+  @@map("permissoes")
+}
+
+model PermissaoUsuario {
+  id                String       @id @default(cuid())
+  usuarioId         String
+  permissaoId       String
+  dataConcessao     DateTime     @default(now())
+  
+  usuario           Usuario      @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permissao         Permissao    @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, permissaoId])
+  @@map("permissoes_usuarios")
+}
+
+model ConfiguracaoOrganizacao {
+  id                String       @id @default(cuid())
+  organizacaoId     String       @unique
+  tema              String       @default("light")
+  idioma            String       @default("pt-BR")
+  fusoHorario       String       @default("America/Sao_Paulo")
+  moeda             String       @default("BRL")
+  formatoData       String       @default("dd/MM/yyyy")
+  formatoHora       String       @default("HH:mm")
+  configuracoes     Json?        // Configurações específicas da organização
+  
+  organizacao       Organizacao  @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+
+  @@map("configuracoes_organizacao")
+}
+
+
+
+enum StatusConservacaoProduto {
+  TEMPERATURA_AMBIENTE
+  CONGELADO
+  RESFRIADO
+}
+
+model ConfiguracaoSistema {
+  id                  String   @id @default(cuid())
+  nomeEmpresa         String
+  emailSuporte        String
+  telefoneSuporte     String?
+  endereco            String?
+  cnpj                String?
+  logo                String?
+  corPrimaria         String   @default("#f2811d")
+  corSecundaria       String   @default("#0ea5e9")
+  timezone            String   @default("America/Sao_Paulo")
+  idioma              String   @default("pt-BR")
+  moeda               String   @default("BRL")
+  backupAutomatico    Boolean  @default(true)
+  notificacoesEmail   Boolean  @default(true)
+  notificacoesSMS     Boolean  @default(false)
+  politicaSenha       Json     @default("{\"tamanhoMinimo\":8,\"caracteresEspeciais\":true,\"numeros\":true,\"maiusculas\":true}")
+  sessao              Json     @default("{\"tempoExpiracao\":24,\"maximoSessoes\":5}")
+  pagamento           Json     @default("{\"gateway\":\"stripe\",\"modoTeste\":true,\"webhookUrl\":\"\"}")
+  dataCriacao         DateTime @default(now())
+  dataAtualizacao     DateTime @updatedAt
+
+  @@map("configuracoes_sistema")
+}

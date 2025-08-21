@@ -1,0 +1,50 @@
+{
+  "name": "granobox-print-agent-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aplicativo de bandeja para o Granobox Print Agent (ZPL/ESC-POS via TCP)",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder -m",
+    "build:win": "electron-builder -w"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "build": {
+    "appId": "com.granobox.printagent",
+    "productName": "Granobox Print Agent",
+    "files": [
+      "main.js",
+      "server.cjs",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg"]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  }
+}
+
+
