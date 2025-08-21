@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Animações de entrada das páginas */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Classes de animação */
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+/* Delays de animação */
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
+.animation-delay-500 {
+  animation-delay: 500ms;
+}
+
+/* Estados iniciais para animações */
+.animate-fade-in-up,
+.animate-fade-in,
+.animate-slide-in-left,
+.animate-slide-in-right {
+  opacity: 0;
+}
+
+/* Hover effects suaves */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+/* Transições suaves para todos os elementos */
+* {
+  transition: all 0.2s ease-out;
+}
+
+/* Animações para cards */
+.card-enter {
+  opacity: 0;
+  transform: scale(0.9) translateY(20px);
+}
+
+.card-enter-active {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+/* Animações para botões */
+.btn-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.btn-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+@layer base {
+  html {
+    font-family: 'Manrope', system-ui, sans-serif;
+  }
+  
+  body {
+    margin: 0;
+    font-family: 'Manrope', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Tema Dark (padrão) */
+  body.dark {
+    background-color: #1a1a1a;
+    color: #ffffff;
+    --toast-bg: #262626;
+    --toast-color: #ffffff;
+    --toast-border: #404040;
+  }
+
+  /* Tema Light */
+  body.light {
+    background-color: #fafafa;
+    color: #1a1a1a;
+    --toast-bg: #ffffff;
+    --toast-color: #1a1a1a;
+    --toast-border: #e5e5e5;
+  }
+}
+
+/* Sobrescrever cores padrão do Tailwind */
+@layer utilities {
+  .text-primary {
+    color: #1DA154 !important;
+  }
+  
+  .bg-primary {
+    background-color: #1DA154 !important;
+  }
+  
+  .border-primary {
+    border-color: #1DA154 !important;
+  }
+  
+  .text-dark-900 {
+    color: #1a1a1a !important;
+  }
+  
+  .bg-dark-900 {
+    background-color: #1a1a1a !important;
+  }
+}
