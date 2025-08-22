@@ -1,5 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext'
-import { Tag, Plus, Printer, Package, ChartLine, Eye, Gear, Warning, XCircle, Info, Trophy, Target, User, SignOut } from '@phosphor-icons/react'
+import { Tag, Plus, Printer, Package, ChartLine, Eye, Gear, Warning, XCircle, Info, Trophy, Target, User, SignOut, CaretDown } from '@phosphor-icons/react'
 import { useState, useEffect } from 'react'
 import FooterNavigation from '@/components/FooterNavigation'
 
@@ -7,6 +7,7 @@ export default function DashboardPage() {
   const { theme, toggleTheme } = useTheme()
   const [showModal, setShowModal] = useState(false)
   const [showUserPopover, setShowUserPopover] = useState(false)
+  const [showEstabelecimentosDropdown, setShowEstabelecimentosDropdown] = useState(false)
 
   // Fechar popover quando clicar fora
   useEffect(() => {
@@ -15,16 +16,19 @@ export default function DashboardPage() {
       if (!target.closest('.user-popover')) {
         setShowUserPopover(false)
       }
+      if (!target.closest('.estabelecimentos-dropdown')) {
+        setShowEstabelecimentosDropdown(false)
+      }
     }
 
-    if (showUserPopover) {
+    if (showUserPopover || showEstabelecimentosDropdown) {
       document.addEventListener('mousedown', handleClickOutside)
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showUserPopover])
+  }, [showUserPopover, showEstabelecimentosDropdown])
 
   const stats = {
     totalEtiquetas: 1247,
@@ -55,10 +59,14 @@ export default function DashboardPage() {
     { icon: ChartLine, label: 'Relatórios', color: 'bg-dark-700', href: '/relatorios' },
   ]
 
-  const estabelecimento = {
-    nome: 'Padaria Central',
-    tipo: 'Padaria'
-  }
+  const estabelecimentos = [
+    { id: 1, nome: 'Padaria Central', tipo: 'Padaria', ativo: true },
+    { id: 2, nome: 'Restaurante Sabor & Arte', tipo: 'Restaurante', ativo: false },
+    { id: 3, nome: 'Confeitaria Doce Lar', tipo: 'Confeitaria', ativo: false },
+    { id: 4, nome: 'Mercearia Familiar', tipo: 'Mercearia', ativo: false }
+  ]
+  
+  const estabelecimentoAtivo = estabelecimentos.find(e => e.ativo) || estabelecimentos[0]
 
   const usuario = {
     nome: 'João Silva',
@@ -86,6 +94,63 @@ export default function DashboardPage() {
           
           {/* Estabelecimento e Usuário */}
           <div className="flex items-center space-x-4">
+            {/* Nome do Estabelecimento com Dropdown */}
+            <div className="relative hidden sm:block estabelecimentos-dropdown">
+              <div 
+                className="flex items-center space-x-2 cursor-pointer p-2 rounded-lg hover:bg-dark-700/20 transition-colors"
+                onClick={() => setShowEstabelecimentosDropdown(!showEstabelecimentosDropdown)}
+              >
+                <div className="text-right">
+                  <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                    {estabelecimentoAtivo.nome}
+                  </div>
+                  <div className={`text-xs ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                    {estabelecimentoAtivo.tipo}
+                  </div>
+                </div>
+                <CaretDown size={16} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
+              </div>
+              
+              {/* Dropdown de Estabelecimentos */}
+              {showEstabelecimentosDropdown && (
+                <div className={`absolute right-0 top-12 w-64 rounded-xl border shadow-2xl z-50 ${
+                  theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-gray-200'
+                }`}>
+                  <div className="p-2">
+                    {estabelecimentos.map((estabelecimento) => (
+                      <div
+                        key={estabelecimento.id}
+                        className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                          estabelecimento.ativo
+                            ? 'bg-primary/20 text-primary'
+                            : theme === 'dark'
+                            ? 'hover:bg-dark-700 text-dark-300'
+                            : 'hover:bg-gray-100 text-gray-700'
+                        }`}
+                        onClick={() => {
+                          // Aqui você implementaria a lógica de troca de estabelecimento
+                          setShowEstabelecimentosDropdown(false)
+                        }}
+                      >
+                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-primary">
+                            {estabelecimento.nome.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium">{estabelecimento.nome}</div>
+                          <div className="text-xs opacity-75">{estabelecimento.tipo}</div>
+                        </div>
+                        {estabelecimento.ativo && (
+                          <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             {/* Botão de Configurações */}
             <a 
               href="/configuracoes"
@@ -93,12 +158,6 @@ export default function DashboardPage() {
             >
               <Gear size={24} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
             </a>
-            
-            {/* Nome do Estabelecimento */}
-            <div className="text-right hidden sm:block">
-              <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>{estabelecimento.nome}</div>
-              <div className={`text-xs ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>{estabelecimento.tipo}</div>
-            </div>
             
             {/* Avatar do Usuário com Popover */}
             <div className="relative user-popover">

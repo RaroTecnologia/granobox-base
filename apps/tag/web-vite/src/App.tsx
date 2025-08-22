@@ -13,6 +13,7 @@ import AlertasPage from '@/app/AlertasPage'
 import EtiquetaDetalhesPage from '@/app/EtiquetaDetalhesPage'
 import CadastroItemPage from '@/app/CadastroItemPage'
 import PerfilPage from '@/app/PerfilPage'
+import RelatoriosPage from '@/app/RelatoriosPage'
 
 const router = createBrowserRouter([
   {
@@ -42,6 +43,10 @@ const router = createBrowserRouter([
   {
     path: "/perfil",
     element: <PerfilPage />,
+  },
+  {
+    path: "/relatorios",
+    element: <RelatoriosPage />,
   },
   {
     path: "/preview",

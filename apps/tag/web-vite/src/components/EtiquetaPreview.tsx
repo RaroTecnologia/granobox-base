@@ -39,7 +39,7 @@ export function EtiquetaPreview({ etiqueta, className = '' }: EtiquetaPreviewPro
 
   return (
     <div 
-      className={`bg-white text-black rounded-lg border border-gray-400 shadow-md relative p-4 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 ${className}`}
+      className={`bg-white text-black rounded-lg border border-gray-400 shadow-md relative p-4 cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-102 ${className}`}
       style={{ 
         width: '350px', 
         height: '350px',

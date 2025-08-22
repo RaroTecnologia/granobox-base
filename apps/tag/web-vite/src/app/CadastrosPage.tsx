@@ -112,34 +112,15 @@ export default function CadastrosPage() {
   const [segmentos, setSegmentos] = useState<Segmento[]>([
     {
       id: 1,
-      nome: 'Manipulado',
-      descricao: 'Produtos manipulados em farmácia',
-      icone: 'HandWaving',
+      nome: 'Matéria Prima',
+      descricao: 'Matérias primas para manipulação',
+      icone: 'TrayArrowDown',
       cor: 'bg-primary',
       categorias: [
         {
           id: 1,
-          nome: 'Medicamentos',
-          descricao: 'Medicamentos manipulados',
-          segmentoId: 1,
-          nivel: 1,
-          itens: [
-            {
-              id: 1,
-              nome: 'Paracetamol 500mg',
-              descricao: 'Analgésico e antitérmico',
-              categoriaId: 1,
-              codigo: 'MED-001',
-              unidade: 'mg',
-              preco: 15.50,
-              ativo: true
-            }
-          ]
-        },
-        {
-          id: 2,
-          nome: 'Suplementos',
-          descricao: 'Suplementos alimentares',
+          nome: 'Excipientes',
+          descricao: 'Excipientes farmacêuticos',
           segmentoId: 1,
           nivel: 1,
           itens: []
@@ -148,15 +129,34 @@ export default function CadastrosPage() {
     },
     {
       id: 2,
-      nome: 'Produto Final',
-      descricao: 'Produtos finais prontos para uso',
-      icone: 'Barcode',
+      nome: 'Manipulado',
+      descricao: 'Produtos manipulados em farmácia',
+      icone: 'HandWaving',
       cor: 'bg-primary',
       categorias: [
         {
+          id: 2,
+          nome: 'Medicamentos',
+          descricao: 'Medicamentos manipulados',
+          segmentoId: 2,
+          nivel: 1,
+          itens: [
+            {
+              id: 1,
+              nome: 'Paracetamol 500mg',
+              descricao: 'Analgésico e antitérmico',
+              categoriaId: 2,
+              codigo: 'MED-001',
+              unidade: 'mg',
+              preco: 15.50,
+              ativo: true
+            }
+          ]
+        },
+        {
           id: 3,
-          nome: 'Cosméticos',
-          descricao: 'Produtos cosméticos',
+          nome: 'Suplementos',
+          descricao: 'Suplementos alimentares',
           segmentoId: 2,
           nivel: 1,
           itens: []
@@ -165,15 +165,15 @@ export default function CadastrosPage() {
     },
     {
       id: 3,
-      nome: 'Matéria Prima',
-      descricao: 'Matérias primas para manipulação',
-      icone: 'TrayArrowDown',
+      nome: 'Produto Final',
+      descricao: 'Produtos finais prontos para uso',
+      icone: 'Barcode',
       cor: 'bg-primary',
       categorias: [
         {
           id: 4,
-          nome: 'Excipientes',
-          descricao: 'Excipientes farmacêuticos',
+          nome: 'Cosméticos',
+          descricao: 'Produtos cosméticos',
           segmentoId: 3,
           nivel: 1,
           itens: []

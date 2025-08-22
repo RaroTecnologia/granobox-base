@@ -1,5 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext'
-import { ChartLine, Package, Warning, Gear, Tag } from '@phosphor-icons/react'
+import { ChartLine, Package, Warning, FileText, Tag } from '@phosphor-icons/react'
 
 export default function FooterNavigation() {
   const { theme } = useTheme()
@@ -40,11 +40,11 @@ export default function FooterNavigation() {
         </a>
         
         <a 
-          href="/configuracoes" 
+          href="/relatorios" 
           className="flex flex-col items-center space-y-1 text-primary"
         >
-          <Gear size={28} weight="duotone" className="text-primary" />
-          <span className="text-xs">Config</span>
+          <FileText size={28} weight="duotone" className="text-primary" />
+          <span className="text-xs">Relatórios</span>
         </a>
       </div>
     </nav>

@@ -287,7 +287,10 @@ export default function EtiquetasPage() {
                 <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
                   {etiquetas.length}
                 </div>
-                <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Total</div>
+                <div className={`text-sm text-primary flex items-center justify-center space-x-1`}>
+                  <Calendar size={16} weight="duotone" />
+                  <span>Este mês</span>
+                </div>
               </div>
             </div>
           </div>
