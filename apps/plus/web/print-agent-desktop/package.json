@@ -2,6 +2,7 @@
   "name": "granobox-print-agent-desktop",
   "version": "0.1.0",
   "private": true,
+  "author": "RaroTecnologia",
   "description": "Aplicativo de bandeja para o Granobox Print Agent (ZPL/ESC-POS via TCP)",
   "main": "main.js",
   "type": "commonjs",
@@ -12,6 +13,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "electron-updater": "^6.6.2",
     "express": "^4.19.2"
   },
   "devDependencies": {
@@ -21,20 +23,46 @@
   "build": {
     "appId": "com.granobox.printagent",
     "productName": "Granobox Print Agent",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "RaroTecnologia",
+        "repo": "granobox-tag"
+      }
+    ],
     "files": [
       "main.js",
       "server.cjs",
       "assets/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "public"
+      },
+      {
+        "from": "fonts",
+        "to": "fonts"
+      }
+    ],
     "mac": {
       "category": "public.app-category.utilities",
-      "target": ["dmg"]
+      "target": [
+        "dmg"
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         }
       ]
     },
@@ -43,8 +71,13 @@
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": false
+    },
+    "dmg": {
+      "sign": false,
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     }
   }
 }
-
-

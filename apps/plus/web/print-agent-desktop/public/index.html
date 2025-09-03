@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Granobox Print Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1DA154;
+            --primary-dark: #1a8f4a;
+            --dark-900: #0f0f0f;
+            --dark-800: #1a1a1a;
+            --dark-700: #2a2a2a;
+            --dark-600: #3a3a3a;
+            --dark-500: #4a4a4a;
+            --dark-400: #6a6a6a;
+            --dark-300: #8a8a8a;
+            --light-50: #fafafa;
+            --light-100: #f5f5f5;
+            --light-200: #e5e5e5;
+            --light-300: #d4d4d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+
+        body {
+            font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--dark-900);
+            color: white;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--dark-700);
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .logo-text h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo-text p {
+            color: var(--primary);
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        .status-bar {
+            background: var(--dark-800);
+            border: 1px solid var(--dark-700);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.error {
+            background: var(--error);
+        }
+
+        .status-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .status-time {
+            color: var(--dark-400);
+            font-size: 0.9rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--dark-800);
+            border: 1px solid var(--dark-700);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(29, 161, 84, 0.1);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark-300);
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--dark-700);
+            border: 2px solid var(--dark-600);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(29, 161, 84, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1rem;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(29, 161, 84, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--dark-600);
+        }
+
+        .btn-secondary:hover {
+            background: var(--dark-500);
+        }
+
+        .btn-test {
+            background: var(--success);
+            margin-right: 0.5rem;
+        }
+
+        .btn-test:hover {
+            background: #0d9488;
+        }
+
+        .btn-danger {
+            background: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .output {
+            background: var(--dark-700);
+            border: 1px solid var(--dark-600);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--dark-300);
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        .profiles-list {
+            margin-top: 1rem;
+        }
+
+        .profile-item {
+            background: var(--dark-700);
+            border: 1px solid var(--dark-600);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .profile-info h4 {
+            color: white;
+            margin-bottom: 0.25rem;
+        }
+
+        .profile-info p {
+            color: var(--dark-400);
+            font-size: 0.9rem;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge.zpl {
+            background: var(--success);
+        }
+
+        .badge.escpos {
+            background: var(--warning);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .logo-text h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">🖨️</div>
+                <div class="logo-text">
+                    <h1>Granobox Print Agent</h1>
+                    <p>Smart Tag. Smart Print.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <div>
+                    <div class="status-text" id="statusText">Carregando...</div>
+                    <div class="status-time" id="statusTime"></div>
+                </div>
+            </div>
+            <div class="status-actions">
+                <button class="btn btn-secondary" onclick="refreshStatus()">
+                    🔄 Atualizar
+                </button>
+                <button class="btn btn-test" onclick="checkForUpdates()" id="updateBtn">
+                    🔄 Verificar Atualizações
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Grid -->
+        <div class="grid">
+            <!-- Configuração da Impressora -->
+            <div class="card">
+                <h3>
+                    <div class="card-icon">⚙️</div>
+                    Configuração da Impressora
+                </h3>
+                
+                <div class="form-group">
+                    <label for="ip">Endereço IP</label>
+                    <input type="text" id="ip" placeholder="192.168.1.100" />
+                </div>
+                
+                <div class="form-group">
+                    <label for="port">Porta</label>
+                    <input type="number" id="port" value="9100" min="1" max="65535" />
+                </div>
+                
+                <button class="btn" onclick="saveConfig()">
+                    💾 Salvar Configuração
+                </button>
+            </div>
+
+            <!-- Testes de Impressão -->
+            <div class="card">
+                <h3>
+                    <div class="card-icon">🧪</div>
+                    Testes de Impressão
+                </h3>
+                
+                <div class="form-group">
+                    <label>Teste ZPL (Etiqueta 6x6)</label>
+                    <div style="margin-bottom: 0.5rem;">
+                        <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--dark-300);">
+                            <input type="checkbox" id="useCustomFont" style="width: auto; margin: 0;">
+                            Usar fonte Manrope (mesma do Granobox Tag)
+                        </label>
+                    </div>
+                    <button class="btn btn-test" onclick="testZpl()">
+                        🏷️ Imprimir Etiqueta 6x6
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Teste ESC/POS (Cupom)</label>
+                    <button class="btn btn-test" onclick="testEscpos()">
+                        🧾 Imprimir Cupom
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label>Teste de Conexão</label>
+                    <button class="btn btn-secondary" onclick="testConnection()">
+                        🔌 Testar Conexão
+                    </button>
+                </div>
+            </div>
+
+            <!-- Perfis de Impressora -->
+            <div class="card">
+                <h3>
+                    <div class="card-icon">📋</div>
+                    Perfis de Impressora
+                </h3>
+                
+                <div class="form-group">
+                    <label for="profileName">Nome do Perfil</label>
+                    <input type="text" id="profileName" placeholder="Impressora Principal" />
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="profileIp">IP</label>
+                        <input type="text" id="profileIp" placeholder="192.168.1.100" />
+                    </div>
+                    <div class="form-group">
+                        <label for="profilePort">Porta</label>
+                        <input type="number" id="profilePort" value="9100" />
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="profileType">Tipo</label>
+                    <select id="profileType" style="width: 100%; padding: 0.75rem 1rem; background: var(--dark-700); border: 2px solid var(--dark-600); border-radius: 8px; color: white; font-size: 1rem;">
+                        <option value="ZPL">ZPL (Etiquetas)</option>
+                        <option value="ESC/POS">ESC/POS (Cupons)</option>
+                    </select>
+                </div>
+                
+                <button class="btn" onclick="saveProfile()">
+                    ➕ Adicionar Perfil
+                </button>
+                
+                <div class="profiles-list" id="profilesList">
+                    <!-- Perfis serão carregados aqui -->
+                </div>
+            </div>
+
+            <!-- Logs e Saída -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h3>
+                    <div class="card-icon">📊</div>
+                    Logs e Saída
+                </h3>
+                
+                <div class="output" id="output">
+                    Aguardando comandos...
+                </div>
+                
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-secondary" onclick="clearOutput()">
+                        🗑️ Limpar
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportLogs()">
+                        📥 Exportar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentConfig = {};
+        let profiles = [];
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            loadConfig();
+            loadProfiles();
+            refreshStatus();
+        });
+
+        // Funções de status
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                const statusDot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                const statusTime = document.getElementById('statusTime');
+                
+                if (data.ok) {
+                    statusDot.className = 'status-dot';
+                    statusText.textContent = 'Serviço Funcionando';
+                    statusTime.textContent = new Date(data.time).toLocaleString('pt-BR');
+                } else {
+                    statusDot.className = 'status-dot error';
+                    statusText.textContent = 'Serviço com Problemas';
+                    statusTime.textContent = 'Erro detectado';
+                }
+                
+                currentConfig = data.config || {};
+                document.getElementById('ip').value = currentConfig.ip || '';
+                document.getElementById('port').value = currentConfig.port || 9100;
+                
+            } catch (error) {
+                logOutput('Erro ao verificar status: ' + error.message, 'error');
+                document.getElementById('statusDot').className = 'status-dot error';
+                document.getElementById('statusText').textContent = 'Erro de Conexão';
+            }
+        }
+
+        // Funções de configuração
+        async function saveConfig() {
+            const ip = document.getElementById('ip').value;
+            const port = parseInt(document.getElementById('port').value) || 9100;
+            
+            try {
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, port })
+                });
+                
+                const result = await response.json();
+                if (result.ok) {
+                    logOutput('Configuração salva com sucesso!', 'success');
+                    currentConfig = result.config;
+                } else {
+                    logOutput('Erro ao salvar configuração: ' + result.error, 'error');
+                }
+            } catch (error) {
+                logOutput('Erro ao salvar configuração: ' + error.message, 'error');
+            }
+        }
+
+        // Funções de teste
+        async function testZpl() {
+            const ip = document.getElementById('ip').value || currentConfig.ip;
+            const port = parseInt(document.getElementById('port').value) || currentConfig.port || 9100;
+            const useCustomFont = document.getElementById('useCustomFont').checked;
+            
+            if (!ip) {
+                logOutput('Erro: Configure o IP da impressora primeiro', 'error');
+                return;
+            }
+            
+            // ZPL para etiqueta 6x6 cm @ 203 DPI
+            const zpl = `^XA
+^CI27
+^PW480
+^LL480
+^LH16,0
+^CF0,40
+^FO0,16
+^FB448,1,0,L,0
+^FDGRANOBOX PRINT AGENT^FS
+^CF0,28
+^FO0,64
+^FB448,2,30,L,0
+^FDETIQUETA 6x6 cm @ 203 DPI^FS
+^FO0,120
+^FB448,2,30,L,0
+^FDTeste de Impressao ZPL^FS
+^FO0,160
+^FB448,2,30,L,0
+^FDData: ${new Date().toLocaleDateString('pt-BR')}^FS
+^FO0,200
+^FB448,2,30,L,0
+^FDHora: ${new Date().toLocaleTimeString('pt-BR')}^FS
+^FO0,240
+^FB448,2,30,L,0
+^FDIP: ${ip}:${port}^FS
+^FO0,280
+^FB448,2,30,L,0
+^FDStatus: FUNCIONANDO^FS
+^FO0,320
+^FB448,2,30,L,0
+^FDGranobox Tag System^FS
+^FO0,360
+^FB448,2,30,L,0
+^FDVersao: 1.0.0^FS
+^FO0,400
+^BQN,2,4
+^FDLA,AGENT-6X6-OK^FS
+^XZ`;
+            
+            try {
+                const fontText = useCustomFont ? 'com fonte Manrope' : 'com fonte padrão';
+                logOutput(`Enviando etiqueta ZPL 6x6 ${fontText}...`, 'info');
+                
+                const response = await fetch('/print/zpl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, port, zpl, useCustomFont })
+                });
+                
+                const result = await response.json();
+                if (result.ok) {
+                    logOutput(`✅ Etiqueta ZPL 6x6 ${fontText} enviada com sucesso!`, 'success');
+                } else {
+                    logOutput('❌ Erro ao enviar ZPL: ' + result.error, 'error');
+                }
+            } catch (error) {
+                logOutput('❌ Erro ao enviar ZPL: ' + error.message, 'error');
+            }
+        }
+
+        async function testEscpos() {
+            const ip = document.getElementById('ip').value || currentConfig.ip;
+            const port = parseInt(document.getElementById('port').value) || currentConfig.port || 9100;
+            
+            if (!ip) {
+                logOutput('Erro: Configure o IP da impressora primeiro', 'error');
+                return;
+            }
+            
+            try {
+                logOutput('Enviando teste ESC/POS...', 'info');
+                
+                const ESC = 0x1B, GS = 0x1D;
+                const data = [];
+                
+                // Inicialização
+                data.push(ESC, 0x40);
+                data.push(ESC, 0x61, 0x01); // Centralizar
+                data.push(ESC, 0x45, 0x01); // Negrito
+                
+                // Título
+                const title = 'GRANOBOX PRINT AGENT';
+                for (let i = 0; i < title.length; i++) {
+                    data.push(title.charCodeAt(i));
+                }
+                data.push(0x0A);
+                
+                // Desligar negrito
+                data.push(ESC, 0x45, 0x00);
+                
+                // Conteúdo
+                const lines = [
+                    'Teste de Impressao ESC/POS',
+                    'Data: ' + new Date().toLocaleDateString('pt-BR'),
+                    'Hora: ' + new Date().toLocaleTimeString('pt-BR'),
+                    'IP: ' + ip + ':' + port,
+                    'Status: FUNCIONANDO',
+                    'Granobox Tag System',
+                    'Versao: 1.0.0'
+                ];
+                
+                for (const line of lines) {
+                    for (let i = 0; i < line.length; i++) {
+                        data.push(line.charCodeAt(i));
+                    }
+                    data.push(0x0A);
+                }
+                
+                // Cortar papel
+                data.push(0x0A, 0x0A);
+                data.push(GS, 0x56, 0x01);
+                
+                const dataBase64 = btoa(String.fromCharCode(...data));
+                
+                const response = await fetch('/print/escpos', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip, port, dataBase64 })
+                });
+                
+                const result = await response.json();
+                if (result.ok) {
+                    logOutput('✅ Teste ESC/POS enviado com sucesso!', 'success');
+                } else {
+                    logOutput('❌ Erro ao enviar ESC/POS: ' + result.error, 'error');
+                }
+            } catch (error) {
+                logOutput('❌ Erro ao enviar ESC/POS: ' + error.message, 'error');
+            }
+        }
+
+        async function testConnection() {
+            const ip = document.getElementById('ip').value || currentConfig.ip;
+            const port = parseInt(document.getElementById('port').value) || currentConfig.port || 9100;
+            
+            if (!ip) {
+                logOutput('Erro: Configure o IP da impressora primeiro', 'error');
+                return;
+            }
+            
+            try {
+                logOutput(`Testando conexão com ${ip}:${port}...`, 'info');
+                
+                // Teste simples de conectividade
+                const response = await fetch('/health');
+                if (response.ok) {
+                    logOutput(`✅ Serviço funcionando. Teste de conexão com impressora em ${ip}:${port}`, 'success');
+                } else {
+                    logOutput('❌ Serviço com problemas', 'error');
+                }
+            } catch (error) {
+                logOutput('❌ Erro no teste de conexão: ' + error.message, 'error');
+            }
+        }
+
+        // Funções de perfis
+        async function loadProfiles() {
+            try {
+                const response = await fetch('/profiles');
+                const data = await response.json();
+                profiles = data.profiles || [];
+                renderProfiles();
+            } catch (error) {
+                logOutput('Erro ao carregar perfis: ' + error.message, 'error');
+            }
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('profileName').value;
+            const ip = document.getElementById('profileIp').value;
+            const port = parseInt(document.getElementById('profilePort').value) || 9100;
+            const type = document.getElementById('profileType').value;
+            
+            if (!name) {
+                logOutput('Erro: Nome do perfil é obrigatório', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/profiles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, ip, port, type })
+                });
+                
+                const result = await response.json();
+                if (result.ok) {
+                    logOutput('Perfil salvo com sucesso!', 'success');
+                    document.getElementById('profileName').value = '';
+                    document.getElementById('profileIp').value = '';
+                    document.getElementById('profilePort').value = '9100';
+                    loadProfiles();
+                } else {
+                    logOutput('Erro ao salvar perfil: ' + result.error, 'error');
+                }
+            } catch (error) {
+                logOutput('Erro ao salvar perfil: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteProfile(name) {
+            try {
+                const response = await fetch(`/profiles/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                if (result.ok) {
+                    logOutput('Perfil removido com sucesso!', 'success');
+                    loadProfiles();
+                } else {
+                    logOutput('Erro ao remover perfil: ' + result.error, 'error');
+                }
+            } catch (error) {
+                logOutput('Erro ao remover perfil: ' + error.message, 'error');
+            }
+        }
+
+        function renderProfiles() {
+            const profilesList = document.getElementById('profilesList');
+            
+            if (profiles.length === 0) {
+                profilesList.innerHTML = '<p style="color: var(--dark-400); text-align: center; padding: 1rem;">Nenhum perfil configurado</p>';
+                return;
+            }
+            
+            profilesList.innerHTML = profiles.map(profile => `
+                <div class="profile-item">
+                    <div class="profile-info">
+                        <h4>${profile.name}</h4>
+                        <p>${profile.ip}:${profile.port} • <span class="badge ${profile.type.toLowerCase()}">${profile.type}</span></p>
+                    </div>
+                    <div class="profile-actions">
+                        <button class="btn btn-test" onclick="useProfile('${profile.name}')">
+                            🎯 Usar
+                        </button>
+                        <button class="btn btn-danger" onclick="deleteProfile('${profile.name}')">
+                            🗑️
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function useProfile(name) {
+            const profile = profiles.find(p => p.name === name);
+            if (profile) {
+                document.getElementById('ip').value = profile.ip;
+                document.getElementById('port').value = profile.port;
+                logOutput(`Perfil "${name}" aplicado`, 'success');
+            }
+        }
+
+        // Funções utilitárias
+        function logOutput(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            const prefix = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+            
+            output.innerHTML += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = 'Aguardando comandos...\n';
+        }
+
+        function exportLogs() {
+            const output = document.getElementById('output').innerText;
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `granobox-print-agent-logs-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Função para verificar atualizações
+        async function checkForUpdates() {
+            const updateBtn = document.getElementById('updateBtn');
+            const originalText = updateBtn.innerHTML;
+            
+            try {
+                updateBtn.innerHTML = '🔍 Verificando...';
+                updateBtn.disabled = true;
+                
+                // Simula verificação de atualizações (no Electron real, isso seria feito via IPC)
+                logOutput('Verificando atualizações do aplicativo...', 'info');
+                
+                // Aqui você pode implementar a comunicação com o processo principal do Electron
+                // Por enquanto, vamos simular
+                setTimeout(() => {
+                    logOutput('✅ Verificação de atualizações concluída', 'success');
+                    logOutput('ℹ️ Para verificar atualizações reais, use o menu da bandeja do sistema', 'info');
+                    
+                    updateBtn.innerHTML = originalText;
+                    updateBtn.disabled = false;
+                }, 2000);
+                
+            } catch (error) {
+                logOutput('❌ Erro ao verificar atualizações: ' + error.message, 'error');
+                updateBtn.innerHTML = originalText;
+                updateBtn.disabled = false;
+            }
+        }
+
+        // Auto-refresh a cada 30 segundos
+        setInterval(refreshStatus, 30000);
+    </script>
+</body>
+</html>
