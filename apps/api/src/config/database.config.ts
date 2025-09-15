@@ -11,7 +11,7 @@ export default registerAs(
     password: process.env.DB_PASSWORD || 'postgres',
     database: process.env.DB_NAME || 'granobox',
     entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-    synchronize: true,
+    synchronize: false,
     logging: process.env.NODE_ENV === 'development',
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
   }),

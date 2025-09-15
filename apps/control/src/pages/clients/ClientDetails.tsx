@@ -31,7 +31,7 @@ import { ContactForm } from '../../components/forms/ContactForm';
 import { EquipmentLoanForm } from '../../components/forms/EquipmentLoanForm';
 import { ClientUsersList } from '../../components/ClientUsersList';
 import { SendInviteModal } from '../../components/modals/SendInviteModal';
-// import ClientSubscriptions from '../../components/ClientSubscriptions';
+import ClientSubscriptions from '../../components/ClientSubscriptions';
 import type { ApiClient, ApiContact, CreateContactRequest, ApiEquipment, CreateEquipmentRequest } from '../../types/api';
 
 type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'subscriptions' | 'templates' | 'support' | 'training';
@@ -1116,19 +1116,7 @@ export function ClientDetails() {
       )}
 
       {activeTab === 'subscriptions' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="text-center py-12">
-            <div className="text-gray-400 mb-4">
-              <CalendarBlank size={48} className="mx-auto" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              Funcionalidade em Desenvolvimento
-            </h3>
-            <p className="text-gray-500">
-              O sistema de assinaturas e operações está sendo desenvolvido e estará disponível em breve.
-            </p>
-          </div>
-        </div>
+        <ClientSubscriptions clientId={id!} />
       )}
 
       {activeTab === 'templates' && (
