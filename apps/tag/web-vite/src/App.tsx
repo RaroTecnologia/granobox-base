@@ -1,17 +1,27 @@
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
 import LoginPage from '@/app/LoginPage'
+import ForgotPasswordPage from '@/app/ForgotPasswordPage'
+import ResetPasswordPage from '@/app/ResetPasswordPage'
+import AcceptInvitePage from '@/app/AcceptInvitePage'
 import DashboardPage from '@/app/DashboardPage'
 import EtiquetasPage from '@/app/EtiquetasPage'
 import CadastrosPage from '@/app/CadastrosPage'
 import ConfiguracoesPage from '@/app/ConfiguracoesPage'
+import ConfigurarImpressoraPage from '@/app/ConfigurarImpressoraPage'
+import AdicionarImpressoraPage from '@/app/AdicionarImpressoraPage'
 import NovaEtiquetaPage from '@/app/NovaEtiquetaPage'
 import PreviewPage from '@/app/PreviewPage'
 import FilaPage from '@/app/FilaPage'
 import AlertasPage from '@/app/AlertasPage'
 import EtiquetaDetalhesPage from '@/app/EtiquetaDetalhesPage'
 import CadastroItemPage from '@/app/CadastroItemPage'
+import CadastroCategoriaPage from '@/app/CadastroCategoriaPage'
+import ValidadeSelecaoPage from '@/app/ValidadeSelecaoPage'
+import ValidadeImpressaoPage from '@/app/ValidadeImpressaoPage'
+import RotuloSelecaoPage from '@/app/RotuloSelecaoPage'
+import RotuloImpressaoPage from '@/app/RotuloImpressaoPage'
 import PerfilPage from '@/app/PerfilPage'
 import RelatoriosPage from '@/app/RelatoriosPage'
 
@@ -21,60 +31,196 @@ const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
+  },
+  {
+    path: "/accept-invite",
+    element: <AcceptInvitePage />,
+  },
+  {
     path: "/dashboard",
-    element: <DashboardPage />,
+    element: (
+      <ProtectedRoute>
+        <DashboardPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/etiquetas",
-    element: <EtiquetasPage />,
+    element: (
+      <ProtectedRoute>
+        <EtiquetasPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/etiquetas/nova",
-    element: <NovaEtiquetaPage />,
+    element: (
+      <ProtectedRoute>
+        <NovaEtiquetaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/etiquetas/validade",
+    element: (
+      <ProtectedRoute>
+        <ValidadeSelecaoPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/etiquetas/validade/impressao",
+    element: (
+      <ProtectedRoute>
+        <ValidadeImpressaoPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/etiquetas/rotulo",
+    element: (
+      <ProtectedRoute>
+        <RotuloSelecaoPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/etiquetas/rotulo/impressao",
+    element: (
+      <ProtectedRoute>
+        <RotuloImpressaoPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/cadastros",
-    element: <CadastrosPage />,
-  },
-  {
-    path: "/configuracoes",
-    element: <ConfiguracoesPage />,
-  },
-  {
-    path: "/perfil",
-    element: <PerfilPage />,
-  },
-  {
-    path: "/relatorios",
-    element: <RelatoriosPage />,
-  },
-  {
-    path: "/preview",
-    element: <PreviewPage />,
-  },
-  {
-    path: "/fila",
-    element: <FilaPage />,
-  },
-  {
-    path: "/alertas",
-    element: <AlertasPage />,
-  },
-  {
-    path: "/etiqueta/:id",
-    element: <EtiquetaDetalhesPage />,
+    element: (
+      <ProtectedRoute>
+        <CadastrosPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/cadastro-item",
-    element: <CadastroItemPage />,
+    element: (
+      <ProtectedRoute>
+        <CadastroItemPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/cadastro/item",
-    element: <CadastroItemPage />,
+    element: (
+      <ProtectedRoute>
+        <CadastroItemPage />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "/cadastro/item/:id",
-    element: <CadastroItemPage />,
+    element: (
+      <ProtectedRoute>
+        <CadastroItemPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/cadastro/categoria",
+    element: (
+      <ProtectedRoute>
+        <CadastroCategoriaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/cadastro/categoria/:id",
+    element: (
+      <ProtectedRoute>
+        <CadastroCategoriaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/configuracoes",
+    element: (
+      <ProtectedRoute>
+        <ConfiguracoesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/configurar-impressora/:id",
+    element: (
+      <ProtectedRoute>
+        <ConfigurarImpressoraPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/adicionar-impressora",
+    element: (
+      <ProtectedRoute>
+        <AdicionarImpressoraPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/perfil",
+    element: (
+      <ProtectedRoute>
+        <PerfilPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/relatorios",
+    element: (
+      <ProtectedRoute>
+        <RelatoriosPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/preview",
+    element: (
+      <ProtectedRoute>
+        <PreviewPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/fila",
+    element: (
+      <ProtectedRoute>
+        <FilaPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/alertas",
+    element: (
+      <ProtectedRoute>
+        <AlertasPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/etiqueta/:id",
+    element: (
+      <ProtectedRoute>
+        <EtiquetaDetalhesPage />
+      </ProtectedRoute>
+    ),
   },
 ], {
   future: {
@@ -83,27 +229,21 @@ const router = createBrowserRouter([
   }
 })
 
+// Suprimir warning do React Router v7
+if (typeof window !== 'undefined') {
+  const originalWarn = console.warn
+  console.warn = (...args) => {
+    if (args[0]?.includes?.('React Router Future Flag Warning')) {
+      return
+    }
+    originalWarn.apply(console, args)
+  }
+}
+
 function App() {
   return (
     <ThemeProvider>
       <RouterProvider router={router} />
-      <Toaster
-        position="bottom-center"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'var(--toast-bg)',
-            color: 'var(--toast-color)',
-            border: '1px solid var(--toast-border)',
-            borderRadius: '16px',
-            padding: '16px',
-            fontSize: '14px',
-            maxWidth: '400px',
-          },
-          success: { iconTheme: { primary: '#1DA154', secondary: '#ffffff' } },
-          error: { iconTheme: { primary: '#ef4444', secondary: '#ffffff' } },
-        }}
-      />
     </ThemeProvider>
   )
 }

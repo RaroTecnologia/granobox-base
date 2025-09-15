@@ -1,13 +1,36 @@
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useOperations } from '@/hooks/useOperations'
+import { useLimits } from '@/hooks/useLimits'
 import { Tag, Plus, Printer, Package, ChartLine, Eye, Gear, Warning, XCircle, Info, Trophy, Target, User, SignOut, CaretDown } from '@phosphor-icons/react'
 import { useState, useEffect } from 'react'
+import { toast } from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
+import LimitsIndicator from '@/components/LimitsIndicator'
 
 export default function DashboardPage() {
   const { theme, toggleTheme } = useTheme()
+  const { user } = useAuth()
+  const { activeOperations, loadActiveOperations, isLoading: operationsLoading } = useOperations()
+  const { canPrintLabels } = useLimits(user?.clientId)
   const [showModal, setShowModal] = useState(false)
   const [showUserPopover, setShowUserPopover] = useState(false)
   const [showEstabelecimentosDropdown, setShowEstabelecimentosDropdown] = useState(false)
+  const [selectedOperation, setSelectedOperation] = useState<string | null>(null)
+
+  // Carregar operações quando o componente montar
+  useEffect(() => {
+    if (user?.clientId) {
+      loadActiveOperations(user.clientId);
+    }
+  }, [user?.clientId]);
+
+  // Definir a primeira operação como selecionada quando as operações carregarem
+  useEffect(() => {
+    if (activeOperations.length > 0 && !selectedOperation) {
+      setSelectedOperation(activeOperations[0].id);
+    }
+  }, [activeOperations, selectedOperation]);
 
   // Fechar popover quando clicar fora
   useEffect(() => {
@@ -53,24 +76,39 @@ export default function DashboardPage() {
   ]
 
   const quickActions = [
-    { icon: Plus, label: 'Nova Etiqueta', color: 'bg-primary', href: '/etiquetas/nova' },
-    { icon: Printer, label: 'Imprimir', color: 'bg-dark-700', href: '/imprimir' },
+    { icon: Plus, label: 'Nova Etiqueta', color: 'bg-primary', href: '/etiquetas/nova', requiresLabelLimit: true },
+    { icon: Printer, label: 'Imprimir', color: 'bg-dark-700', href: '/imprimir', requiresLabelLimit: true },
     { icon: Package, label: 'Estoque', color: 'bg-dark-700', href: '/estoque' },
     { icon: ChartLine, label: 'Relatórios', color: 'bg-dark-700', href: '/relatorios' },
   ]
 
-  const estabelecimentos = [
-    { id: 1, nome: 'Padaria Central', tipo: 'Padaria', ativo: true },
-    { id: 2, nome: 'Restaurante Sabor & Arte', tipo: 'Restaurante', ativo: false },
-    { id: 3, nome: 'Confeitaria Doce Lar', tipo: 'Confeitaria', ativo: false },
-    { id: 4, nome: 'Mercearia Familiar', tipo: 'Mercearia', ativo: false }
-  ]
+  // Converter operações para o formato esperado pelo dropdown
+  const estabelecimentos = activeOperations.map(op => ({
+    id: op.id,
+    nome: op.name,
+    tipo: 'Operação',
+    ativo: op.status === 'active' && op.isActive
+  }))
   
-  const estabelecimentoAtivo = estabelecimentos.find(e => e.ativo) || estabelecimentos[0]
+  const estabelecimentoAtivo = estabelecimentos.find(e => e.id === selectedOperation) || estabelecimentos[0]
 
   const usuario = {
-    nome: 'João Silva',
-    iniciais: 'JS'
+    nome: user?.name || 'Usuário',
+    iniciais: user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'
+  }
+
+  // Função para validar ações que requerem limite de etiquetas
+  const handleActionClick = async (action: any) => {
+    if (action.requiresLabelLimit && user?.clientId) {
+      const canPrint = await canPrintLabels(1); // Verificar se pode imprimir pelo menos 1 etiqueta
+      if (!canPrint) {
+        toast.error('Limite de etiquetas atingido para este mês. Faça upgrade do seu plano.');
+        return;
+      }
+    }
+    
+    // Se chegou até aqui, pode prosseguir com a ação
+    window.location.href = action.href;
   }
 
   return (
@@ -92,8 +130,13 @@ export default function DashboardPage() {
             </div>
           </div>
           
-          {/* Estabelecimento e Usuário */}
+          {/* Estabelecimento, Limites e Usuário */}
           <div className="flex items-center space-x-4">
+            {/* Indicador de Limites */}
+            {user?.clientId && (
+              <LimitsIndicator clientId={user.clientId} compact={true} />
+            )}
+            
             {/* Nome do Estabelecimento com Dropdown */}
             <div className="relative hidden sm:block estabelecimentos-dropdown">
               <div 
@@ -102,10 +145,10 @@ export default function DashboardPage() {
               >
                 <div className="text-right">
                   <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                    {estabelecimentoAtivo.nome}
+                    {operationsLoading ? 'Carregando...' : (estabelecimentoAtivo?.nome || 'Nenhuma operação')}
                   </div>
                   <div className={`text-xs ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                    {estabelecimentoAtivo.tipo}
+                    {estabelecimentoAtivo?.tipo || 'Operação'}
                   </div>
                 </div>
                 <CaretDown size={16} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
@@ -117,35 +160,41 @@ export default function DashboardPage() {
                   theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-gray-200'
                 }`}>
                   <div className="p-2">
-                    {estabelecimentos.map((estabelecimento) => (
-                      <div
-                        key={estabelecimento.id}
-                        className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
-                          estabelecimento.ativo
-                            ? 'bg-primary/20 text-primary'
-                            : theme === 'dark'
-                            ? 'hover:bg-dark-700 text-dark-300'
-                            : 'hover:bg-gray-100 text-gray-700'
-                        }`}
-                        onClick={() => {
-                          // Aqui você implementaria a lógica de troca de estabelecimento
-                          setShowEstabelecimentosDropdown(false)
-                        }}
-                      >
-                        <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold text-primary">
-                            {estabelecimento.nome.charAt(0)}
-                          </span>
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-medium">{estabelecimento.nome}</div>
-                          <div className="text-xs opacity-75">{estabelecimento.tipo}</div>
-                        </div>
-                        {estabelecimento.ativo && (
-                          <div className="w-2 h-2 bg-primary rounded-full"></div>
-                        )}
+                    {estabelecimentos.length === 0 ? (
+                      <div className={`p-4 text-center ${theme === 'dark' ? 'text-dark-400' : 'text-gray-500'}`}>
+                        Nenhuma operação disponível
                       </div>
-                    ))}
+                    ) : (
+                      estabelecimentos.map((estabelecimento) => (
+                        <div
+                          key={estabelecimento.id}
+                          className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors cursor-pointer ${
+                            estabelecimento.id === selectedOperation
+                              ? 'bg-primary/20 text-primary'
+                              : theme === 'dark'
+                              ? 'hover:bg-dark-700 text-dark-300'
+                              : 'hover:bg-gray-100 text-gray-700'
+                          }`}
+                          onClick={() => {
+                            setSelectedOperation(estabelecimento.id);
+                            setShowEstabelecimentosDropdown(false);
+                          }}
+                        >
+                          <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-bold text-primary">
+                              {estabelecimento.nome.charAt(0)}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{estabelecimento.nome}</div>
+                            <div className="text-xs opacity-75">{estabelecimento.tipo}</div>
+                          </div>
+                          {estabelecimento.ativo && (
+                            <div className="w-2 h-2 bg-primary rounded-full"></div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -313,9 +362,9 @@ export default function DashboardPage() {
               const isPrimary = action.color === 'bg-primary';
               
               return (
-                <a
+                <button
                   key={index}
-                  href={action.href}
+                  onClick={() => handleActionClick(action)}
                   className={`${
                     isPrimary 
                       ? 'bg-primary' 
@@ -324,7 +373,7 @@ export default function DashboardPage() {
                 >
                   <action.icon size={32} weight="duotone" className="text-white mb-2" />
                   <span className="text-white text-sm font-medium text-center">{action.label}</span>
-                </a>
+                </button>
               );
             })}
           </div>

@@ -7,12 +7,13 @@ interface FormInputProps {
   error?: string
   hasError?: boolean
   icon?: React.ComponentType<any>
+  rightIcon?: React.ReactNode
   className?: string
   [key: string]: any
 }
 
 export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
-  ({ label, error, hasError, icon: Icon, className = '', ...props }, ref) => {
+  ({ label, error, hasError, icon: Icon, rightIcon, className = '', ...props }, ref) => {
     const { theme } = useTheme()
 
     const inputClasses = `
@@ -59,9 +60,9 @@ export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
             {...props}
           />
           
-          {hasError && (
+          {rightIcon && (
             <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <Warning size={20} weight="duotone" className="text-red-500" />
+              {rightIcon}
             </div>
           )}
         </div>

@@ -1,7 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
-import { useFormValidation } from '@/hooks/useFormValidation'
+import { useCategories } from '@/hooks/useCategories'
+import { useProducts } from '@/hooks/useProducts'
 import { 
   Package, 
   ChartLine, 
@@ -22,505 +24,533 @@ import {
   Tag,
   User,
   Calendar,
-  X
+  X,
+  Spinner
 } from '@phosphor-icons/react'
 import FooterNavigation from '@/components/FooterNavigation'
-
-interface Segmento {
-  id: number
-  nome: string
-  descricao: string
-  icone: string
-  cor: string
-  categorias: Categoria[]
-}
-
-interface Categoria {
-  id: number
-  nome: string
-  descricao: string
-  segmentoId: number
-  parentId?: number
-  nivel: number
-  itens: Item[]
-}
-
-interface Item {
-  id: number
-  nome: string
-  descricao: string
-  categoriaId: number
-  foto?: string
-  codigo: string
-  pesoVolume: string
-  marca: string
-  validadeAmbiente: number
-  validadeRefrigerado: number
-  validadeCongelado: number
-  ingredientes: string
-  precoVenda: number
-  custoProducao: number
-  observacoes: string
-  ativo: boolean
-}
+import type { Category, Product } from '@/services/categoriesService'
+import type { ProductType } from '@/services/productsService'
+import { productsService } from '@/services/productsService'
 
 export default function CadastrosPage() {
   const { theme } = useTheme()
-  const [activeTab, setActiveTab] = useState<'segmentos' | 'categorias' | 'itens'>('segmentos')
-  const [searchTerm, setSearchTerm] = useState('')
-  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set())
-  const [showItemModal, setShowItemModal] = useState(false)
-  const [itemFormData, setItemFormData] = useState({ nome: '', segmento: '' })
-  const [formErrors, setFormErrors] = useState<{ nome?: string; segmento?: string }>({})
+  const { user, isLoading: authLoading } = useAuth()
   const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState<'categorias' | 'produtos'>('categorias')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
-  const handleItemSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log('Form submitted:', itemFormData)
-    setFormErrors({})
-    
-    // Validação manual simples
-    if (itemFormData.nome.trim() && itemFormData.segmento) {
-      console.log('Validation passed, navigating...')
-      // Simular criação do item e obter ID
-      const newItemId = Math.floor(Math.random() * 1000) + 1
-      const url = `/cadastro/item/${newItemId}?nome=${encodeURIComponent(itemFormData.nome)}&segmento=${encodeURIComponent(itemFormData.segmento)}`
-      console.log('Navigating to:', url)
-      navigate(url)
-      setShowItemModal(false)
-      setItemFormData({ nome: '', segmento: '' })
+  // Para usuários manager, usar o primeiro cliente disponível
+  const clientId = user?.clientId || (user?.role === 'manager' ? '6621e831-5d1d-4801-8c33-b0f93446a3df' : undefined)
+
+  // Hooks da API
+  const { 
+    categories, 
+    rootCategories, 
+    isLoading: categoriesLoading, 
+    error: categoriesError,
+    getCategoriesByParent 
+  } = useCategories(clientId)
+
+  const { 
+    products, 
+    isLoading: productsLoading, 
+    error: productsError,
+    applyFilters,
+    getProductsByCategory 
+  } = useProducts(clientId)
+
+  // Estados de loading e erro
+  const isLoading = authLoading || categoriesLoading || productsLoading
+  const error = categoriesError || productsError
+
+  // Filtrar produtos por categoria selecionada
+  const filteredProducts = selectedCategory 
+    ? getProductsByCategory(selectedCategory)
+    : products.filter(product => 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.code.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+
+  // Filtrar categorias por busca
+  const filteredCategories = categories.filter(category =>
+    category.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const toggleCategoryExpansion = (categoryId: string) => {
+    const newExpanded = new Set(expandedCategories)
+    if (newExpanded.has(categoryId)) {
+      newExpanded.delete(categoryId)
     } else {
-      console.log('Validation failed - nome:', itemFormData.nome, 'segmento:', itemFormData.segmento)
-      // Mostrar erros manuais
-      const newErrors: { nome?: string; segmento?: string } = {}
-      if (!itemFormData.nome.trim()) newErrors.nome = 'Nome do item é obrigatório'
-      if (!itemFormData.segmento) newErrors.segmento = 'Segmento é obrigatório'
-      setFormErrors(newErrors)
-      console.log('Setting errors:', newErrors)
+      newExpanded.add(categoryId)
     }
+    setExpandedCategories(newExpanded)
   }
 
-  const handleInputChange = (field: string, value: string) => {
-    setItemFormData(prev => ({ ...prev, [field]: value }))
-    // Limpar erro do campo quando o usuário digita/seleciona
-    if (formErrors[field as keyof typeof formErrors]) {
-      setFormErrors(prev => ({ ...prev, [field]: undefined }))
-    }
-  }
-
-  // Mock data
-  const [segmentos, setSegmentos] = useState<Segmento[]>([
-    {
-      id: 1,
-      nome: 'Matéria Prima',
-      descricao: 'Matérias primas para manipulação',
-      icone: 'TrayArrowDown',
-      cor: 'bg-primary',
-      categorias: [
-        {
-          id: 1,
-          nome: 'Excipientes',
-          descricao: 'Excipientes farmacêuticos',
-          segmentoId: 1,
-          nivel: 1,
-          itens: []
-        }
-      ]
-    },
-    {
-      id: 2,
-      nome: 'Manipulado',
-      descricao: 'Produtos manipulados em farmácia',
-      icone: 'HandWaving',
-      cor: 'bg-primary',
-      categorias: [
-        {
-          id: 2,
-          nome: 'Medicamentos',
-          descricao: 'Medicamentos manipulados',
-          segmentoId: 2,
-          nivel: 1,
-          itens: [
-            {
-              id: 1,
-              nome: 'Paracetamol 500mg',
-              descricao: 'Analgésico e antitérmico',
-              categoriaId: 2,
-              codigo: 'MED-001',
-              unidade: 'mg',
-              preco: 15.50,
-              ativo: true
-            }
-          ]
-        },
-        {
-          id: 3,
-          nome: 'Suplementos',
-          descricao: 'Suplementos alimentares',
-          segmentoId: 2,
-          nivel: 1,
-          itens: []
-        }
-      ]
-    },
-    {
-      id: 3,
-      nome: 'Produto Final',
-      descricao: 'Produtos finais prontos para uso',
-      icone: 'Barcode',
-      cor: 'bg-primary',
-      categorias: [
-        {
-          id: 4,
-          nome: 'Cosméticos',
-          descricao: 'Produtos cosméticos',
-          segmentoId: 3,
-          nivel: 1,
-          itens: []
-        }
-      ]
-    }
-  ])
-
-  const getIconComponent = (iconName: string) => {
-    switch (iconName) {
-      case 'HandWaving': return <HandWaving size={24} weight="duotone" />
-      case 'Barcode': return <Barcode size={24} weight="duotone" />
-      case 'TrayArrowDown': return <TrayArrowDown size={24} weight="duotone" />
-      default: return <Package size={24} weight="duotone" />
-    }
-  }
-
-  const toggleExpanded = (id: number) => {
-    const newExpanded = new Set(expandedItems)
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id)
+  const handleCategorySelect = (categoryId: string | null) => {
+    setSelectedCategory(categoryId)
+    if (categoryId) {
+      applyFilters({ categoryId })
     } else {
-      newExpanded.add(id)
+      applyFilters({})
     }
-    setExpandedItems(newExpanded)
   }
 
-  const handleAddNew = (type: 'categoria' | 'item') => {
-    // This function is no longer needed as the "Novo Item" button navigates directly
+  const getProductTypeLabel = (type: ProductType): string => {
+    return productsService.getProductTypeLabel(type)
   }
 
-  const renderSegmentos = () => (
-    <div className="space-y-4">
-      {segmentos.map((segmento) => (
-        <div key={segmento.id} className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-4">
-              <div className={`w-12 h-12 ${segmento.cor} rounded-full flex items-center justify-center text-white`}>
-                {getIconComponent(segmento.icone)}
-              </div>
-              <div>
-                <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  {segmento.nome}
-                </h3>
-                <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                  {segmento.descricao}
-                </p>
-              </div>
-            </div>
+  const getProductTypeColor = (type: ProductType): string => {
+    return productsService.getProductTypeColor(type)
+  }
+
+  const renderCategoryTree = (parentCategories: Category[], level: number = 0) => {
+    return parentCategories.map((category) => {
+      const subcategories = getCategoriesByParent(category.id)
+      const hasSubcategories = subcategories.length > 0
+      const isExpanded = expandedCategories.has(category.id)
+      const isSelected = selectedCategory === category.id
+      const categoryProducts = getProductsByCategory(category.id)
+
+      return (
+        <div key={category.id} className="mb-2">
+          <div 
+            className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+              isSelected
+                ? theme === 'dark' 
+                  ? 'bg-primary/20 border-primary text-primary' 
+                  : 'bg-primary/10 border-primary text-primary'
+                : theme === 'dark'
+                ? 'bg-dark-700 border-dark-600 hover:bg-dark-600'
+                : 'bg-white border-light-200 hover:bg-light-50'
+            }`}
+            style={{ marginLeft: `${level * 20}px` }}
+            onClick={() => handleCategorySelect(category.id)}
+          >
+             <div className="flex items-center space-x-3">
+               {hasSubcategories && (
+                 <button
+                   onClick={(e) => {
+                     e.stopPropagation()
+                     toggleCategoryExpansion(category.id)
+                   }}
+                   className="p-1 rounded hover:bg-black/10"
+                 >
+                   {isExpanded ? (
+                     <CaretDown size={16} weight="bold" />
+                   ) : (
+                     <CaretRight size={16} weight="bold" />
+                   )}
+                 </button>
+               )}
+               
+               <div>
+                 <h3 className="font-medium">{category.name}</h3>
+                 {category.description && (
+                   <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                     {category.description}
+                   </p>
+                 )}
+               </div>
+             </div>
+
             <div className="flex items-center space-x-2">
-              <span className={`text-sm px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-dark-700 text-dark-300' : 'bg-light-100 text-dark-600'}`}>
-                {segmento.categorias.length} categorias
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                theme === 'dark' ? 'bg-dark-600 text-dark-300' : 'bg-light-100 text-dark-600'
+              }`}>
+                {categoryProducts.length} {categoryProducts.length === 1 ? 'produto' : 'produtos'}
               </span>
+              
+              <div className="flex space-x-1">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate(`/cadastro/categoria/${category.id}`)
+                  }}
+                  className={`p-1 rounded hover:bg-black/10 ${
+                    theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'
+                  }`}
+                >
+                  <PencilSimple size={16} />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // TODO: Implementar exclusão
+                  }}
+                  className="p-1 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                >
+                  <Trash size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Categorias do Segmento */}
-          <div className="space-y-3">
-            {segmento.categorias.map((categoria) => (
-              <div key={categoria.id} className={`${theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-200'} rounded-xl p-4 border`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center">
-                      <Tag size={16} weight="duotone" className="text-primary" />
-                    </div>
-                    <div>
-                      <h4 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                        {categoria.nome}
-                      </h4>
-                      <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                        {categoria.descricao}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className={`text-xs px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-dark-600 text-dark-300' : 'bg-light-200 text-dark-600'}`}>
-                      {categoria.itens.length} itens
-                    </span>
-                    <button className="p-1 text-primary hover:bg-primary/10 rounded-full transition-colors">
-                      <PencilSimple size={16} weight="duotone" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {isExpanded && hasSubcategories && (
+            <div className="mt-2">
+              {renderCategoryTree(subcategories, level + 1)}
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
+
+  const renderProductCard = (product: Product) => (
+    <div 
+      key={product.id}
+      className={`p-4 rounded-lg border transition-all ${
+        theme === 'dark' 
+          ? 'bg-dark-700 border-dark-600 hover:bg-dark-600' 
+          : 'bg-white border-light-200 hover:bg-light-50'
+      }`}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center space-x-2 mb-1">
+            <h3 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+              {product.name}
+            </h3>
+            <span 
+              className="text-xs px-2 py-1 rounded-full text-white font-medium"
+              style={{ backgroundColor: getProductTypeColor(product.type) }}
+            >
+              {getProductTypeLabel(product.type)}
+            </span>
+          </div>
+          
+          <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} mb-2`}>
+            Código: {product.code}
+          </p>
+          
+          {product.description && (
+            <p className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'} mb-2`}>
+              {product.description}
+            </p>
+          )}
+
+          <div className="flex items-center space-x-4 text-sm">
+            {product.salePrice && (
+              <span className={`${theme === 'dark' ? 'text-green-400' : 'text-green-600'} font-medium`}>
+                {productsService.formatPrice(product.salePrice, product.currency)}
+              </span>
+            )}
+            
+            {product.weight && product.weightUnit && (
+              <span className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                {productsService.formatWeight(product.weight, product.weightUnit)}
+              </span>
+            )}
+            
+            {product.brand && (
+              <span className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                {product.brand}
+              </span>
+            )}
           </div>
         </div>
-      ))}
-    </div>
-  )
 
-  const renderCategorias = () => (
-    <div className="space-y-4">
-      {segmentos.flatMap(segmento => 
-        segmento.categorias.map(categoria => (
-          <div key={categoria.id} className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                  <Tag size={24} weight="duotone" className="text-primary" />
+        <div className="flex space-x-1 ml-4">
+          <button 
+            onClick={() => navigate(`/etiqueta/${product.id}`)}
+            className={`p-2 rounded hover:bg-black/10 ${
+              theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'
+            }`}
+            title="Ver detalhes"
+          >
+            <Eye size={16} />
+          </button>
+          <button 
+            onClick={() => navigate(`/cadastro/item/${product.id}`)}
+            className={`p-2 rounded hover:bg-black/10 ${
+              theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'
+            }`}
+            title="Editar"
+          >
+            <PencilSimple size={16} />
+          </button>
+          <button 
+            onClick={() => {
+              // TODO: Implementar exclusão
+            }}
+            className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+            title="Excluir"
+          >
+            <Trash size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Informações de validade */}
+      {(product.shelfLifeAmbient || product.shelfLifeRefrigerated || product.shelfLifeFrozen) && (
+        <div className="border-t pt-3 mt-3">
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            {product.shelfLifeAmbient && (
+              <div className={`text-center p-2 rounded ${
+                theme === 'dark' ? 'bg-dark-600' : 'bg-light-100'
+              }`}>
+                <div className={`${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                  Ambiente
                 </div>
-                <div>
-                  <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                    {categoria.nome}
-                  </h3>
-                  <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                    {categoria.descricao}
-                  </p>
-                  <p className={`text-xs ${theme === 'dark' ? 'text-dark-500' : 'text-dark-500'}`}>
-                    Segmento: {segmentos.find(s => s.id === categoria.segmentoId)?.nome}
-                  </p>
+                <div className="font-medium">
+                  {productsService.getShelfLifeText(product.shelfLifeAmbient)}
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className={`text-sm px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-dark-700 text-dark-300' : 'bg-light-100 text-dark-600'}`}>
-                  {categoria.itens.length} itens
-                </span>
-                <button className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors">
-                  <PencilSimple size={20} weight="duotone" />
-                </button>
-                <button className="p-2 text-dark-400 hover:bg-dark-700 rounded-full transition-colors">
-                  <Trash size={20} weight="duotone" />
-                </button>
+            )}
+            
+            {product.shelfLifeRefrigerated && (
+              <div className={`text-center p-2 rounded ${
+                theme === 'dark' ? 'bg-dark-600' : 'bg-light-100'
+              }`}>
+                <div className={`${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                  Refrigerado
+                </div>
+                <div className="font-medium">
+                  {productsService.getShelfLifeText(product.shelfLifeRefrigerated)}
+                </div>
               </div>
-            </div>
+            )}
+            
+            {product.shelfLifeFrozen && (
+              <div className={`text-center p-2 rounded ${
+                theme === 'dark' ? 'bg-dark-600' : 'bg-light-100'
+              }`}>
+                <div className={`${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                  Congelado
+                </div>
+                <div className="font-medium">
+                  {productsService.getShelfLifeText(product.shelfLifeFrozen)}
+                </div>
+              </div>
+            )}
           </div>
-        ))
+        </div>
       )}
     </div>
   )
 
-  const renderItens = () => (
-    <div className="space-y-4">
-      {segmentos.flatMap(segmento => 
-        segmento.categorias.flatMap(categoria => 
-          categoria.itens.map(item => (
-            <div key={item.id} className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                    <Package size={24} weight="duotone" className="text-primary" />
-                  </div>
-                  <div>
-                    <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                      {item.nome}
-                    </h3>
-                    <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                      {item.descricao}
-                    </p>
-                    <p className={`text-xs ${theme === 'dark' ? 'text-dark-500' : 'text-dark-500'}`}>
-                      {segmentos.find(s => s.id === categoria.segmentoId)?.nome} → {categoria.nome}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-dark-700 text-dark-300' : 'bg-light-100 text-dark-600'}`}>
-                    {item.codigo}
-                  </span>
-                  <button className="p-2 text-primary hover:bg-primary/10 rounded-full transition-colors">
-                    <PencilSimple size={20} weight="duotone" />
-                  </button>
-                  <button className="p-2 text-dark-400 hover:bg-dark-700 rounded-full transition-colors">
-                    <Trash size={20} weight="duotone" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
-        )
-      )}
-    </div>
-  )
+  // Mostrar loading enquanto carrega autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Spinner size={48} className="animate-spin text-primary mb-4" />
+          <p className="text-lg">Carregando...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Verificar se usuário está logado
+  if (!clientId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Warning size={48} className="mx-auto text-yellow-500 mb-4" />
+          <p className="text-lg">Acesso negado</p>
+          <p className="text-sm text-gray-600">Você precisa estar logado para acessar esta página.</p>
+          <button
+            onClick={() => navigate('/login')}
+            className="mt-4 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Fazer Login
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900 text-white' : 'bg-light-50 text-dark-900'} pb-20`}>
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900' : 'bg-light-50'}`}>
       {/* Header */}
-      <header className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b px-4 py-4 sticky top-0 z-10`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
-              <Package size={24} weight="duotone" className="text-primary" />
+      <header className={`sticky top-0 z-40 backdrop-blur-sm border-b ${
+        theme === 'dark' 
+          ? 'bg-dark-950/95 border-dark-800' 
+          : 'bg-white/95 border-light-200'
+      }`}>
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
+                <Package size={24} weight="duotone" className="text-white" />
+              </div>
+              <div>
+                <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                  Cadastros
+                </h1>
+                <p className="text-primary text-sm">Gerencie seus produtos e categorias</p>
+              </div>
             </div>
-            <h1 className="text-xl font-bold">Cadastros</h1>
+
+            <div className="flex space-x-2">
+              {activeTab === 'categorias' && (
+                <button
+                  onClick={() => navigate('/cadastro/categoria')}
+                  className={`px-4 py-2 rounded-lg border-2 flex items-center space-x-2 transition-colors ${
+                    theme === 'dark' 
+                      ? 'border-dark-600 text-dark-300 hover:border-dark-500 hover:text-white' 
+                      : 'border-light-300 text-dark-600 hover:border-dark-400 hover:text-dark-900'
+                  }`}
+                >
+                  <Plus size={20} />
+                  <span>Nova Categoria</span>
+                </button>
+              )}
+              
+              <button
+                onClick={() => navigate('/cadastro/item')}
+                className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <Plus size={20} />
+                <span>Novo Produto</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setShowItemModal(true)}
-            className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
-          >
-            <Plus size={16} weight="duotone" />
-            <span>Novo Item</span>
-          </button>
+
+          {/* Tabs */}
+          <div className="flex space-x-1 mt-4">
+            {[
+              { id: 'categorias', label: 'Categorias', icon: TrayArrowDown },
+              { id: 'produtos', label: 'Produtos', icon: Package },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-primary text-white'
+                    : theme === 'dark'
+                    ? 'text-dark-400 hover:text-white hover:bg-dark-700'
+                    : 'text-dark-600 hover:text-dark-900 hover:bg-light-100'
+                }`}
+              >
+                <tab.icon size={18} weight="duotone" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="mt-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder={`Buscar ${activeTab}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full pl-10 pr-4 py-2 rounded-lg border transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-dark-700 border-dark-600 text-white placeholder-dark-400 focus:border-primary'
+                    : 'bg-white border-light-300 text-dark-900 placeholder-dark-400 focus:border-primary'
+                } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+              />
+              <MagnifyingGlass size={20} className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+                theme === 'dark' ? 'text-dark-400' : 'text-dark-500'
+              }`} />
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Conteúdo Principal */}
-      <main className="p-4 space-y-6">
-        {/* Tabs */}
-        <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-2 border shadow-xl`}>
-          <div className="flex space-x-2">
-            {[
-              { key: 'segmentos', label: 'Segmentos', icon: Package },
-              { key: 'categorias', label: 'Categorias', icon: Tag },
-              { key: 'itens', label: 'Itens', icon: Package }
-            ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl transition-all duration-200 ${
-                  activeTab === tab.key
-                    ? 'bg-primary text-white shadow-lg'
-                    : `${theme === 'dark' ? 'text-dark-400 hover:text-white hover:bg-dark-700' : 'text-dark-600 hover:text-dark-900 hover:bg-light-100'}`
-                }`}
-              >
-                <tab.icon size={20} weight="duotone" />
-                <span className="font-medium">{tab.label}</span>
-              </button>
-            ))}
+      {/* Content */}
+      <main className="px-6 py-6 pb-24">
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-center text-red-700">
+              <Warning size={20} className="mr-2" />
+              <span>{error}</span>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Busca e Filtros */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <MagnifyingGlass 
-              size={20} 
-              weight="duotone" 
-              className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} 
-            />
-            <input
-              type="text"
-              placeholder={`Buscar ${activeTab === 'segmentos' ? 'segmentos' : activeTab === 'categorias' ? 'categorias' : 'itens'}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-3 rounded-full border-2 transition-all duration-200 focus:outline-none ${
-                theme === 'dark' 
-                  ? 'bg-dark-800 border-dark-700 text-white focus:border-primary' 
-                  : 'bg-white border-light-200 text-dark-900 focus:border-primary'
-              }`}
-            />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Spinner size={32} className="animate-spin text-primary" />
+            <span className="ml-3 text-lg">Carregando...</span>
           </div>
-        </div>
+        ) : (
+          <>
+            {activeTab === 'categorias' && (
+              <div className="space-y-4">
+                {/* Filtro "Todas as categorias" */}
+                <div 
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+                    selectedCategory === null
+                      ? theme === 'dark' 
+                        ? 'bg-primary/20 border-primary text-primary' 
+                        : 'bg-primary/10 border-primary text-primary'
+                      : theme === 'dark'
+                      ? 'bg-dark-700 border-dark-600 hover:bg-dark-600'
+                      : 'bg-white border-light-200 hover:bg-light-50'
+                  }`}
+                  onClick={() => handleCategorySelect(null)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Package size={20} weight="duotone" />
+                    <span className="font-medium">Todas as categorias</span>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    theme === 'dark' ? 'bg-dark-600 text-dark-300' : 'bg-light-100 text-dark-600'
+                  }`}>
+                    {products.length} {products.length === 1 ? 'produto' : 'produtos'}
+                  </span>
+                </div>
 
-        {/* Conteúdo das Tabs */}
-        <div className="min-h-[400px]">
-          {activeTab === 'segmentos' && renderSegmentos()}
-          {activeTab === 'categorias' && renderCategorias()}
-          {activeTab === 'itens' && renderItens()}
-        </div>
+                 {rootCategories.filter(cat => 
+                   cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+                 ).length === 0 ? (
+                   <div className="text-center py-12">
+                     <Package size={48} className={`mx-auto mb-4 ${
+                       theme === 'dark' ? 'text-dark-600' : 'text-dark-400'
+                     }`} />
+                     <p className={`text-lg mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                       Nenhuma categoria encontrada
+                     </p>
+                     <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                       {searchTerm ? 'Tente ajustar sua busca' : 'Comece criando sua primeira categoria'}
+                     </p>
+                   </div>
+                 ) : (
+                   renderCategoryTree(rootCategories.filter(cat => 
+                     cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+                   ))
+                 )}
+              </div>
+            )}
+
+            {activeTab === 'produtos' && (
+              <div className="space-y-4">
+                {filteredProducts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Package size={48} className={`mx-auto mb-4 ${
+                      theme === 'dark' ? 'text-dark-600' : 'text-dark-400'
+                    }`} />
+                    <p className={`text-lg mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                      Nenhum produto encontrado
+                    </p>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                      {searchTerm || selectedCategory ? 'Tente ajustar seus filtros' : 'Comece criando seu primeiro produto'}
+                    </p>
+                    <button
+                      onClick={() => navigate('/cadastro/item')}
+                      className="mt-4 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg flex items-center space-x-2 mx-auto transition-colors"
+                    >
+                      <Plus size={20} />
+                      <span>Criar Primeiro Produto</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredProducts.map(renderProductCard)}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </main>
 
-      {/* Modal de Novo Item */}
-      {showItemModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-2xl max-w-md w-full`}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                Novo Item
-              </h3>
-              <button
-                onClick={() => setShowItemModal(false)}
-                className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'}`}
-              >
-                <X size={20} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
-              </button>
-            </div>
-
-            <form onSubmit={handleItemSubmit} className="space-y-4">
-              <div>
-                <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  Nome do Item
-                </label>
-                <input
-                  type="text"
-                  value={itemFormData.nome}
-                  onChange={(e) => handleInputChange('nome', e.target.value)}
-                  placeholder="Ex: Pão de Queijo"
-                  className={`w-full px-4 py-3 rounded-xl border-2 transition-all duration-200 focus:outline-none ${
-                    theme === 'dark' 
-                      ? 'bg-dark-700 border-dark-600 text-white focus:border-primary' 
-                      : 'bg-light-100 border-light-200 text-dark-900 focus:border-primary'
-                  }`}
-                />
-                {formErrors.nome && <p className="text-xs text-red-500 mt-1">{formErrors.nome}</p>}
-              </div>
-
-              <div>
-                <label className={`block text-sm font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  Segmento
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { value: 'Manipulado', icon: HandWaving, color: 'bg-primary' },
-                    { value: 'Produto Final', icon: Tag, color: 'bg-primary' },
-                    { value: 'Matéria Prima', icon: Package, color: 'bg-primary' }
-                  ].map((tipo) => (
-                    <div
-                      key={tipo.value}
-                      onClick={() => handleInputChange('segmento', tipo.value)}
-                      className={`cursor-pointer rounded-xl p-4 border-2 transition-all duration-200 ${
-                        itemFormData.segmento === tipo.value
-                          ? `${tipo.color} border-transparent text-white shadow-lg scale-105`
-                          : `${theme === 'dark' ? 'bg-dark-700 border-dark-600 hover:border-primary' : 'bg-light-100 border-light-200 hover:border-primary'} hover:scale-102`
-                      }`}
-                    >
-                      <div className="flex flex-col items-center space-y-2 text-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          itemFormData.segmento === tipo.value ? 'bg-white/20' : 'bg-gray-100'
-                        }`}>
-                          <tipo.icon 
-                            size={16} 
-                            weight="duotone" 
-                            className={itemFormData.segmento === tipo.value ? 'text-white' : 'text-gray-600'} 
-                          />
-                        </div>
-                        <div className={`font-semibold text-xs ${itemFormData.segmento === tipo.value ? 'text-white' : theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                          {tipo.value}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {formErrors.segmento && <p className="text-xs text-red-500 mt-1">{formErrors.segmento}</p>}
-              </div>
-
-              {/* Botões de Ação */}
-              <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setShowItemModal(false)}
-                  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={!itemFormData.nome.trim() || !itemFormData.segmento}
-                  className="px-4 py-2 bg-primary hover:bg-primary-600 disabled:bg-gray-400 text-white rounded-full text-sm font-medium transition-colors disabled:cursor-not-allowed"
-                >
-                  Continuar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Footer Navigation */}
       <FooterNavigation />
     </div>
   )

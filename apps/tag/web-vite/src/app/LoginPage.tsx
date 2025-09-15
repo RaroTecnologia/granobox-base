@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { FormInput } from '@/components/FormInput'
 import { useFormValidation } from '@/hooks/useFormValidation'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { Envelope, Lock, Eye, EyeSlash } from '@phosphor-icons/react'
 
 interface LoginForm {
@@ -38,6 +39,7 @@ const validationRules = {
 export default function LoginPage() {
   const navigate = useNavigate()
   const { theme } = useTheme()
+  const { login, isLoading: authLoading } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   
   const {
@@ -55,8 +57,7 @@ export default function LoginPage() {
 
   const onSubmit = async (formData: LoginForm) => {
     try {
-      // Simular login
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await login(formData.email, formData.password)
       
       // Mostrar sucesso
       toast.success('Login realizado com sucesso! Redirecionando...', {
@@ -66,9 +67,9 @@ export default function LoginPage() {
       // Redirecionar
       setTimeout(() => navigate('/dashboard'), 1000)
       
-    } catch (error) {
+    } catch (error: any) {
       // Mostrar erro
-      toast.error('Erro no login. Verifique suas credenciais e tente novamente.', {
+      toast.error(error.message || 'Erro no login. Verifique suas credenciais e tente novamente.', {
         duration: 5000,
       })
     }
@@ -109,55 +110,52 @@ export default function LoginPage() {
             <FormInput
               label="Email"
               type="text"
-              placeholder="seu@email.com"
               icon={Envelope}
               value={emailField.value}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => emailField.onChange(e.target.value)}
               onBlur={emailField.onBlur}
               error={emailField.error}
               hasError={emailField.hasError}
+              autoComplete="email"
             />
 
-            <div className="space-y-2">
-              <div className="relative">
-                <FormInput
-                  label="Senha"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  icon={Lock}
-                  value={passwordField.value}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => passwordField.onChange(e.target.value)}
-                  onBlur={passwordField.onBlur}
-                  error={passwordField.error}
-                  hasError={passwordField.hasError}
-                />
-                
+            <FormInput
+              label="Senha"
+              type={showPassword ? 'text' : 'password'}
+              icon={Lock}
+              rightIcon={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 ${
+                  className={`${
                     theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'
                   } transition-colors`}
                 >
                   {showPassword ? <EyeSlash size={20} weight="duotone" /> : <Eye size={20} weight="duotone" />}
                 </button>
-              </div>
-            </div>
+              }
+              value={passwordField.value}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => passwordField.onChange(e.target.value)}
+              onBlur={passwordField.onBlur}
+              error={passwordField.error}
+              hasError={passwordField.hasError}
+              autoComplete="current-password"
+            />
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || authLoading}
               className="w-full bg-primary hover:bg-primary-600 disabled:bg-primary-400 text-white font-semibold py-3 px-6 rounded-full transition-all duration-200 shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Entrando...' : 'Entrar'}
+              {(isSubmitting || authLoading) ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
 
           {/* Links de Ajuda */}
           <div className="mt-6 text-center">
-            <a href="#" className={`text-sm ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
+            <Link to="/forgot-password" className={`text-sm ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}>
               Esqueceu sua senha?
-            </a>
+            </Link>
           </div>
         </div>
       </main>

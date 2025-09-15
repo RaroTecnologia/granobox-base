@@ -8,6 +8,7 @@ import {
   EnvelopeSimple, 
   MapPin,
   Calendar,
+  CalendarBlank,
   CreditCard,
   Wrench,
   HeadsetIcon,
@@ -18,7 +19,8 @@ import {
   WhatsappLogo,
   Users,
   Envelope,
-  FileText
+  FileText,
+  Receipt
 } from '@phosphor-icons/react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -29,9 +31,10 @@ import { ContactForm } from '../../components/forms/ContactForm';
 import { EquipmentLoanForm } from '../../components/forms/EquipmentLoanForm';
 import { ClientUsersList } from '../../components/ClientUsersList';
 import { SendInviteModal } from '../../components/modals/SendInviteModal';
+// import ClientSubscriptions from '../../components/ClientSubscriptions';
 import type { ApiClient, ApiContact, CreateContactRequest, ApiEquipment, CreateEquipmentRequest } from '../../types/api';
 
-type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'templates' | 'support' | 'training';
+type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'subscriptions' | 'templates' | 'support' | 'training';
 
 export function ClientDetails() {
   const navigate = useNavigate();
@@ -47,7 +50,7 @@ export function ClientDetails() {
   // Função para obter a aba do hash da URL
   const getTabFromHash = (): TabType => {
     const hash = location.hash.replace('#', '');
-    const validTabs: TabType[] = ['overview', 'contacts', 'equipment', 'users', 'support', 'training'];
+    const validTabs: TabType[] = ['overview', 'contacts', 'equipment', 'users', 'subscriptions', 'templates', 'support', 'training'];
     return validTabs.includes(hash as TabType) ? (hash as TabType) : 'overview';
   };
 
@@ -399,6 +402,7 @@ export function ClientDetails() {
     { id: 'contacts', label: 'Contatos', icon: EnvelopeSimple },
     { id: 'equipment', label: 'Equipamentos', icon: Wrench },
     { id: 'users', label: 'Usuários', icon: Users },
+    { id: 'subscriptions', label: 'Assinaturas', icon: Receipt },
     { id: 'templates', label: 'Templates', icon: FileText },
     { id: 'support', label: 'Suporte', icon: HeadsetIcon },
     { id: 'training', label: 'Treinamentos', icon: GraduationCap },
@@ -1107,6 +1111,22 @@ export function ClientDetails() {
               <Envelope size={16} className="mr-2" />
               Enviar Convite
             </Button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'subscriptions' && (
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <CalendarBlank size={48} className="mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Funcionalidade em Desenvolvimento
+            </h3>
+            <p className="text-gray-500">
+              O sistema de assinaturas e operações está sendo desenvolvido e estará disponível em breve.
+            </p>
           </div>
         </div>
       )}

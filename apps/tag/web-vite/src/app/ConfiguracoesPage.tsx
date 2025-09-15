@@ -1,5 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useConfig } from '@/hooks/useConfig'
+import { usePrinters } from '@/hooks/usePrinters'
 import { 
   Gear, 
   Printer, 
@@ -19,15 +23,77 @@ import {
   PencilSimple,
   FloppyDisk,
   X,
-  Warning
+  Warning,
+  ArrowClockwise
 } from '@phosphor-icons/react'
 import { toast } from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
 
 export default function ConfiguracoesPage() {
+  const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
+  const { user } = useAuth()
+  const { 
+    userProfile, 
+    systemConfig, 
+    printerConfig, 
+    notificationConfig,
+    isLoading,
+    loadUserProfile,
+    updateUserProfile,
+    changePassword,
+    loadSystemConfig,
+    updateSystemConfig,
+    loadPrinterConfig,
+    updatePrinterConfig,
+    testPrinter,
+    loadNotificationConfig,
+    updateNotificationConfig,
+    uploadLogo
+  } = useConfig()
+  
+  const { printers, loadPrinters } = usePrinters()
+  
   const [activeTab, setActiveTab] = useState<'impressora' | 'sistema' | 'usuario' | 'usuarios' | 'backup'>('impressora')
   const [editMode, setEditMode] = useState<string | null>(null)
+  
+  // Estados para formulários
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+
+  // Estado para formulário de edição do usuário
+  const [userEditForm, setUserEditForm] = useState({
+    name: '',
+    email: '',
+    role: '',
+    phone: ''
+  })
+
+  // Carregar dados quando o componente montar
+  useEffect(() => {
+    if (user) {
+      loadUserProfile()
+      loadSystemConfig()
+      loadPrinterConfig()
+      loadNotificationConfig()
+      loadPrinters()
+    }
+  }, [user])
+
+  // Popular formulário de edição quando o perfil for carregado
+  useEffect(() => {
+    if (userProfile) {
+      setUserEditForm({
+        name: userProfile.name || '',
+        email: userProfile.email || '',
+        role: userProfile.role || '',
+        phone: userProfile.phone ? formatPhone(userProfile.phone) : ''
+      })
+    }
+  }, [userProfile])
   
   // Estados para configurações
   const [impressoraConfig, setImpressoraConfig] = useState({
@@ -117,14 +183,106 @@ export default function ConfiguracoesPage() {
     confirmarSenha: ''
   })
 
-  const handleSave = (section: string) => {
-    setEditMode(null)
-    toast.success('Configurações salvas com sucesso!')
+  const handleSave = async (section: string) => {
+    try {
+      switch (section) {
+        case 'usuario':
+          await updateUserProfile({
+            name: userEditForm.name,
+            email: userEditForm.email,
+            phone: userEditForm.phone,
+            role: userEditForm.role
+          })
+          break
+        case 'sistema':
+          if (systemConfig) {
+            await updateSystemConfig({
+              businessName: systemConfig.businessName,
+              cnpj: systemConfig.cnpj,
+              address: systemConfig.address,
+              phone: systemConfig.phone,
+              email: systemConfig.email
+            })
+          }
+          break
+        case 'impressora':
+          if (printerConfig) {
+            await updatePrinterConfig({
+              name: printerConfig.name,
+              ip: printerConfig.ip,
+              port: printerConfig.port,
+              model: printerConfig.model,
+              isActive: printerConfig.isActive
+            })
+          }
+          break
+        default:
+          toast.success('Configurações salvas com sucesso!')
+      }
+      setEditMode(null)
+    } catch (error) {
+      console.error('Erro ao salvar configurações:', error)
+    }
   }
 
   const handleCancel = () => {
     setEditMode(null)
+    // Resetar formulário de edição para os valores originais
+    if (userProfile) {
+      setUserEditForm({
+        name: userProfile.name || '',
+        email: userProfile.email || '',
+        role: userProfile.role || '',
+        phone: userProfile.phone ? formatPhone(userProfile.phone) : ''
+      })
+    }
     toast.error('Alterações canceladas')
+  }
+
+  const handleChangePassword = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('As senhas não coincidem!')
+      return
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('A nova senha deve ter pelo menos 6 caracteres!')
+      return
+    }
+
+    try {
+      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      })
+    } catch (error) {
+      console.error('Erro ao alterar senha:', error)
+    }
+  }
+
+  // Função para aplicar máscara de telefone
+  const formatPhone = (value: string) => {
+    // Remove todos os caracteres não numéricos
+    const numbers = value.replace(/\D/g, '')
+    
+    // Aplica a máscara baseada no tamanho
+    if (numbers.length <= 2) {
+      return numbers
+    } else if (numbers.length <= 6) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`
+    } else if (numbers.length <= 10) {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 6)}-${numbers.slice(6)}`
+    } else {
+      return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`
+    }
+  }
+
+  // Função para lidar com mudança no telefone
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhone(e.target.value)
+    setUserEditForm(prev => ({ ...prev, phone: formatted }))
   }
 
   // Funções para upload de logos
@@ -163,11 +321,12 @@ export default function ConfiguracoesPage() {
     }
   }
 
-  const testarImpressora = () => {
-    toast.loading('Testando impressora...')
-    setTimeout(() => {
-      toast.success('Impressora funcionando perfeitamente!')
-    }, 2000)
+  const testarImpressora = async () => {
+    try {
+      await testPrinter()
+    } catch (error) {
+      console.error('Erro ao testar impressora:', error)
+    }
   }
 
   // Funções para gerenciamento de usuários
@@ -269,7 +428,7 @@ export default function ConfiguracoesPage() {
   }
 
   const tabs = [
-    { id: 'impressora', label: 'Impressora', icon: Printer },
+    { id: 'impressora', label: 'Impressoras', icon: Printer },
     { id: 'sistema', label: 'Sistema', icon: Gear },
     { id: 'usuario', label: 'Usuário', icon: User },
     { id: 'usuarios', label: 'Usuários', icon: User },
@@ -332,106 +491,104 @@ export default function ConfiguracoesPage() {
         {/* Tab Impressora */}
         {activeTab === 'impressora' && (
           <div className="space-y-6 animate-fade-in-up">
+
+            {/* Lista de Impressoras */}
             <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Configurações da Impressora</h2>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={testarImpressora}
-                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
-                  >
-                    <CheckCircle size={16} weight="duotone" />
-                    <span>Testar</span>
-                  </button>
-                  <button
-                    onClick={() => setEditMode('impressora')}
-                    className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
-                  >
-                    <PencilSimple size={16} weight="duotone" />
-                    <span>Editar</span>
-                  </button>
-                </div>
+                <h2 className="text-xl font-semibold">Impressoras Configuradas</h2>
+                <button
+                  onClick={() => navigate('/adicionar-impressora')}
+                  className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+                >
+                  <Plus size={16} />
+                  <span>Adicionar</span>
+                </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nome da Impressora</label>
-                  {editMode === 'impressora' ? (
-                    <input
-                      type="text"
-                      value={impressoraConfig.nome}
-                      onChange={(e) => setImpressoraConfig(prev => ({ ...prev, nome: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {impressoraConfig.nome}
-                    </p>
-                  )}
-                </div>
+              <div className="space-y-4">
+                {printers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Printer size={48} className="mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">Nenhuma impressora configurada</p>
+                    <p className="text-sm text-gray-400 mt-2">Clique em "Adicionar" para criar sua primeira impressora</p>
+                  </div>
+                ) : (
+                  printers.map((printer) => {
+                    const getStatusColor = (status: string) => {
+                      switch (status) {
+                        case 'online': return 'bg-green-500'
+                        case 'offline': return 'bg-red-500'
+                        case 'connecting': return 'bg-yellow-500'
+                        default: return 'bg-gray-500'
+                      }
+                    }
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Endereço IP</label>
-                  {editMode === 'impressora' ? (
-                    <input
-                      type="text"
-                      value={impressoraConfig.ip}
-                      onChange={(e) => setImpressoraConfig(prev => ({ ...prev, ip: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {impressoraConfig.ip}
-                    </p>
-                  )}
-                </div>
+                    const getStatusText = (status: string) => {
+                      switch (status) {
+                        case 'online': return 'Online'
+                        case 'offline': return 'Offline'
+                        case 'connecting': return 'Conectando'
+                        default: return 'Desconhecido'
+                      }
+                    }
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Porta</label>
-                  {editMode === 'impressora' ? (
-                    <input
-                      type="text"
-                      value={impressoraConfig.porta}
-                      onChange={(e) => setImpressoraConfig(prev => ({ ...prev, porta: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {impressoraConfig.porta}
-                    </p>
-                  )}
-                </div>
+                    const getStatusTextColor = (status: string) => {
+                      switch (status) {
+                        case 'online': return 'text-green-600'
+                        case 'offline': return 'text-red-600'
+                        case 'connecting': return 'text-yellow-600'
+                        default: return 'text-gray-600'
+                      }
+                    }
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Modelo</label>
-                  {editMode === 'impressora' ? (
-                    <input
-                      type="text"
-                      value={impressoraConfig.modelo}
-                      onChange={(e) => setImpressoraConfig(prev => ({ ...prev, modelo: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {impressoraConfig.modelo}
-                    </p>
-                  )}
-                </div>
+                    return (
+                      <div key={printer.id} className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-300'}`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-2 h-2 ${getStatusColor(printer.status)} rounded-full`}></div>
+                            <div>
+                              <p className="font-medium">{printer.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {printer.ip}:{printer.port} - {printer.model}
+                                {printer.location && ` (${printer.location})`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-sm font-medium ${getStatusTextColor(printer.status)}`}>
+                              {getStatusText(printer.status)}
+                            </span>
+                            <button 
+                              onClick={() => navigate(`/configurar-impressora/${printer.id}`)}
+                              className="p-1 hover:bg-gray-100 rounded"
+                            >
+                              <PencilSimple size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
               </div>
 
-              {/* Status da Impressora */}
-              <div className="mt-6 p-4 rounded-xl bg-green-50 border border-green-200">
-                <div className="flex items-center space-x-3">
-                  <CheckCircle size={20} weight="duotone" className="text-green-600" />
-                  <span className="text-green-800 font-medium">Impressora Online e Funcionando</span>
+              {/* Estatísticas */}
+              <div className="mt-6 grid grid-cols-3 gap-4">
+                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                  <p className="text-2xl font-bold text-green-600">
+                    {printers.filter(p => p.status === 'online').length}
+                  </p>
+                  <p className="text-sm text-gray-500">Online</p>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                  <p className="text-2xl font-bold text-red-600">
+                    {printers.filter(p => p.status === 'offline').length}
+                  </p>
+                  <p className="text-sm text-gray-500">Offline</p>
+                </div>
+                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                  <p className="text-2xl font-bold text-blue-600">{printers.length}</p>
+                  <p className="text-sm text-gray-500">Total</p>
                 </div>
               </div>
 
@@ -464,119 +621,129 @@ export default function ConfiguracoesPage() {
                 <h2 className="text-xl font-semibold">Informações da Empresa</h2>
                 <button
                   onClick={() => setEditMode('sistema')}
-                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2 disabled:opacity-50"
                 >
                   <PencilSimple size={16} weight="duotone" />
                   <span>Editar</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nome da Empresa</label>
-                  {editMode === 'sistema' ? (
-                    <input
-                      type="text"
-                      value={sistemaConfig.nomeEmpresa}
-                      onChange={(e) => setSistemaConfig(prev => ({ ...prev, nomeEmpresa: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {sistemaConfig.nomeEmpresa}
-                    </p>
-                  )}
+              {isLoading && !systemConfig ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2">Carregando configurações...</span>
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nome da Empresa</label>
+                    {editMode === 'sistema' ? (
+                      <input
+                        type="text"
+                        value={systemConfig?.businessName || ''}
+                        onChange={(e) => setSystemConfig(prev => prev ? { ...prev, businessName: e.target.value } : null)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {systemConfig?.businessName || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">CNPJ</label>
-                  {editMode === 'sistema' ? (
-                    <input
-                      type="text"
-                      value={sistemaConfig.cnpj}
-                      onChange={(e) => setSistemaConfig(prev => ({ ...prev, cnpj: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {sistemaConfig.cnpj}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">CNPJ</label>
+                    {editMode === 'sistema' ? (
+                      <input
+                        type="text"
+                        value={systemConfig?.cnpj || ''}
+                        onChange={(e) => setSystemConfig(prev => prev ? { ...prev, cnpj: e.target.value } : null)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {systemConfig?.cnpj || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2">Endereço</label>
-                  {editMode === 'sistema' ? (
-                    <input
-                      type="text"
-                      value={sistemaConfig.endereco}
-                      onChange={(e) => setSistemaConfig(prev => ({ ...prev, endereco: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {sistemaConfig.endereco}
-                    </p>
-                  )}
-                </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-2">Endereço</label>
+                    {editMode === 'sistema' ? (
+                      <input
+                        type="text"
+                        value={systemConfig?.address || ''}
+                        onChange={(e) => setSystemConfig(prev => prev ? { ...prev, address: e.target.value } : null)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {systemConfig?.address || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Telefone</label>
-                  {editMode === 'sistema' ? (
-                    <input
-                      type="text"
-                      value={sistemaConfig.telefone}
-                      onChange={(e) => setSistemaConfig(prev => ({ ...prev, telefone: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {sistemaConfig.telefone}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Telefone</label>
+                    {editMode === 'sistema' ? (
+                      <input
+                        type="text"
+                        value={systemConfig?.phone || ''}
+                        onChange={(e) => setSystemConfig(prev => prev ? { ...prev, phone: e.target.value } : null)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {systemConfig?.phone || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email</label>
-                  {editMode === 'sistema' ? (
-                    <input
-                      type="email"
-                      value={sistemaConfig.email}
-                      onChange={(e) => setSistemaConfig(prev => ({ ...prev, email: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {sistemaConfig.email}
-                    </p>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email</label>
+                    {editMode === 'sistema' ? (
+                      <input
+                        type="email"
+                        value={systemConfig?.email || ''}
+                        onChange={(e) => setSystemConfig(prev => prev ? { ...prev, email: e.target.value } : null)}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {systemConfig?.email || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Botões de Ação */}
               {editMode === 'sistema' && (
                 <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
                   <button
                     onClick={handleCancel}
-                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={() => handleSave('sistema')}
-                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    Salvar
+                    {isLoading ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
               )}
@@ -815,101 +982,123 @@ export default function ConfiguracoesPage() {
                 <h2 className="text-xl font-semibold">Perfil do Usuário</h2>
                 <button
                   onClick={() => setEditMode('usuario')}
-                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2 disabled:opacity-50"
                 >
                   <PencilSimple size={16} weight="duotone" />
                   <span>Editar</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Nome Completo</label>
-                  {editMode === 'usuario' ? (
-                    <input
-                      type="text"
-                      value={usuarioConfig.nome}
-                      onChange={(e) => setUsuarioConfig(prev => ({ ...prev, nome: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {usuarioConfig.nome}
-                    </p>
-                  )}
+              {isLoading && !userProfile ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                  <span className="ml-2">Carregando perfil...</span>
                 </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nome Completo</label>
+                    {editMode === 'usuario' ? (
+                      <input
+                        type="text"
+                        value={userEditForm.name}
+                        onChange={(e) => setUserEditForm(prev => ({ ...prev, name: e.target.value }))}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {userProfile?.name || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Email</label>
-                  {editMode === 'usuario' ? (
-                    <input
-                      type="email"
-                      value={usuarioConfig.email}
-                      onChange={(e) => setUsuarioConfig(prev => ({ ...prev, email: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {usuarioConfig.email}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email</label>
+                    {editMode === 'usuario' ? (
+                      <input
+                        type="email"
+                        value={userEditForm.email}
+                        onChange={(e) => setUserEditForm(prev => ({ ...prev, email: e.target.value }))}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {userProfile?.email || 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Cargo</label>
-                  {editMode === 'usuario' ? (
-                    <input
-                      type="text"
-                      value={usuarioConfig.cargo}
-                      onChange={(e) => setUsuarioConfig(prev => ({ ...prev, cargo: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {usuarioConfig.cargo}
-                    </p>
-                  )}
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Perfil</label>
+                    {editMode === 'usuario' ? (
+                      <select
+                        value={userEditForm.role}
+                        onChange={(e) => setUserEditForm(prev => ({ ...prev, role: e.target.value }))}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      >
+                        <option value="admin">Administrador</option>
+                        <option value="manager">Gerente</option>
+                        <option value="support">Suporte</option>
+                        <option value="sales">Vendas</option>
+                        <option value="viewer">Visualizador</option>
+                      </select>
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {userProfile?.role === 'admin' && 'Administrador'}
+                        {userProfile?.role === 'manager' && 'Gerente'}
+                        {userProfile?.role === 'support' && 'Suporte'}
+                        {userProfile?.role === 'sales' && 'Vendas'}
+                        {userProfile?.role === 'viewer' && 'Visualizador'}
+                        {!userProfile?.role && 'Carregando...'}
+                      </p>
+                    )}
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium mb-2">Telefone</label>
-                  {editMode === 'usuario' ? (
-                    <input
-                      type="text"
-                      value={usuarioConfig.telefone}
-                      onChange={(e) => setUsuarioConfig(prev => ({ ...prev, telefone: e.target.value }))}
-                      className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
-                        theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
-                      }`}
-                    />
-                  ) : (
-                    <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                      {usuarioConfig.telefone}
-                    </p>
-                  )}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Telefone</label>
+                    {editMode === 'usuario' ? (
+                      <input
+                        type="text"
+                        value={userEditForm.phone}
+                        onChange={handlePhoneChange}
+                        placeholder="(11) 99999-9999"
+                        maxLength={15}
+                        className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
+                          theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
+                        }`}
+                      />
+                    ) : (
+                      <p className={`px-4 py-3 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
+                        {userProfile?.phone || 'Não informado'}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Botões de Ação */}
               {editMode === 'usuario' && (
                 <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
                   <button
                     onClick={handleCancel}
-                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={() => handleSave('usuario')}
-                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors"
+                    disabled={isLoading}
+                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors disabled:opacity-50"
                   >
-                    Salvar
+                    {isLoading ? 'Salvando...' : 'Salvar'}
                   </button>
                 </div>
               )}
@@ -924,6 +1113,8 @@ export default function ConfiguracoesPage() {
                   <input
                     type="password"
                     placeholder="Digite sua senha atual"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                       theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
                     }`}
@@ -934,6 +1125,8 @@ export default function ConfiguracoesPage() {
                   <input
                     type="password"
                     placeholder="Digite a nova senha"
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                       theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
                     }`}
@@ -944,13 +1137,19 @@ export default function ConfiguracoesPage() {
                   <input
                     type="password"
                     placeholder="Confirme a nova senha"
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                     className={`w-full px-4 py-3 rounded-xl border-2 transition-all focus:outline-none focus:ring-2 focus:ring-primary ${
                       theme === 'dark' ? 'bg-dark-700 border-dark-600 text-white' : 'bg-light-100 border-light-300 text-dark-900'
                     }`}
                   />
                 </div>
-                <button className="w-full px-4 py-3 bg-primary hover:bg-primary-600 text-white rounded-xl font-medium transition-colors">
-                  Alterar Senha
+                <button 
+                  onClick={handleChangePassword}
+                  disabled={isLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                  className="w-full px-4 py-3 bg-primary hover:bg-primary-600 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Alterando...' : 'Alterar Senha'}
                 </button>
               </div>
             </div>

@@ -315,6 +315,3 @@ const UploadTemplate: React.FC = () => {
 };
 
 export default UploadTemplate;
-
-
-

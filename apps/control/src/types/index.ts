@@ -395,3 +395,6 @@ export interface SendMessageForm {
 
 // Export template types
 export * from './templates';
+
+// Export template types
+export * from './templates';

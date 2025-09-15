@@ -11,8 +11,8 @@ export default new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || '37b981ba868ace4338cf',
   database: process.env.DB_NAME || 'granoboxtag',
-  entities: [join(__dirname, 'src/**/*.entity{.ts,.js}')],
-  migrations: [join(__dirname, 'src/migrations/*{.ts,.js}')],
+  entities: [join(process.cwd(), 'dist/src/**/*.entity{.ts,.js}')],
+  migrations: [join(process.cwd(), 'dist/src/migrations/*{.ts,.js}')],
   synchronize: false,
   logging: true,
 });
