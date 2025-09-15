@@ -19,6 +19,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { ConfigModule as AppConfigModule } from './modules/config/config.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     ContactsModule,
     EquipmentModule,
     SubscriptionsModule,
+    ProductsModule,
     AppConfigModule,
   ],
   controllers: [AppController],

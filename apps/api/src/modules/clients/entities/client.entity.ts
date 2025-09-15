@@ -8,6 +8,8 @@ import {
 } from 'typeorm';
 import { Equipment } from '../../equipment/entities/equipment.entity';
 import { ClientUser } from './client-user.entity';
+import { Subscription } from '../../subscriptions/entities/subscription.entity';
+import { Operation } from '../../subscriptions/entities/operation.entity';
 
 export enum ClientType {
   INDIVIDUAL = 'individual', // Pessoa Física
@@ -143,6 +145,18 @@ export class Client {
   @OneToMany(() => ClientUser, user => user.client)
   users: ClientUser[];
 
+  @OneToMany(() => Subscription, subscription => subscription.client)
+  subscriptions: Subscription[];
+
+  @OneToMany(() => Operation, operation => operation.client)
+  operations: Operation[];
+
+  // Relacionamentos com produtos (serão adicionados quando o módulo for importado)
+  // @OneToMany(() => Product, product => product.client)
+  // products: Product[];
+
+  // @OneToMany(() => Category, category => category.client)
+  // categories: Category[];
 
   // @OneToMany(() => SupportTicket, ticket => ticket.client)
   // supportTickets: SupportTicket[];
