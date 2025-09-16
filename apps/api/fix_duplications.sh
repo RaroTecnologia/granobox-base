@@ -57,3 +57,4 @@ for file in "${files[@]}"; do
 done
 
 echo "🎉 Correção concluída!"
+

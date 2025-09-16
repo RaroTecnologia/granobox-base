@@ -243,4 +243,14 @@ export class CreateClientDto {
   @IsOptional()
   @IsString({ message: 'Observações devem ser uma string' })
   notes?: string;
+
+  @ApiProperty({
+    description: 'API Key do Tagment para integração de impressão',
+    required: false,
+    example: 'gbx_1234567890_abcdef',
+  })
+  @IsOptional()
+  @IsString({ message: 'API Key do Tagment deve ser uma string' })
+  @MaxLength(255, { message: 'API Key do Tagment deve ter no máximo 255 caracteres' })
+  tagmentApiKey?: string;
 }

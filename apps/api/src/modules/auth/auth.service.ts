@@ -56,8 +56,72 @@ export class AuthService {
   ) {}
 
   async login(loginDto: LoginDto, ipAddress?: string, userAgent?: string): Promise<AuthResponse> {
-    // Primeiro, tentar login como usuário do sistema
+    console.log('🔍 Tentando login para:', loginDto.email);
+    
+    // Primeiro, verificar se existe usuário cliente
+    const clientUser = await this.clientUserRepository.findOne({
+      where: { email: loginDto.email },
+      relations: ['client'],
+    });
+
+    console.log('👤 Usuário cliente encontrado:', !!clientUser);
+
+    if (clientUser) {
+      if (clientUser.status !== ClientUserStatus.ACTIVE) {
+        throw new UnauthorizedException('Usuário não está ativo');
+      }
+
+      // Verificar senha
+      if (!clientUser.password) {
+        throw new UnauthorizedException('Credenciais inválidas');
+      }
+      
+      const isPasswordValid = await bcrypt.compare(loginDto.password, clientUser.password);
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Credenciais inválidas');
+      }
+
+      // Atualizar último login
+      clientUser.lastLoginAt = new Date();
+      await this.clientUserRepository.save(clientUser);
+
+      // Gerar JWT
+      const payload = {
+        sub: clientUser.id,
+        email: clientUser.email,
+        role: clientUser.role,
+        clientId: clientUser.clientId,
+      };
+
+      const access_token = this.jwtService.sign(payload);
+
+      // Log de auditoria para usuário cliente
+      this.auditService.logLogin(clientUser.id, clientUser.email, 'client', clientUser.clientId, ipAddress, userAgent);
+
+      // Remover senha do retorno
+      const { password, ...userWithoutPassword } = clientUser;
+
+      return {
+        access_token,
+        user: {
+          id: clientUser.id,
+          email: clientUser.email,
+          name: clientUser.name,
+          role: clientUser.role,
+          clientId: clientUser.clientId,
+          status: clientUser.status,
+          lastLogin: clientUser.lastLoginAt,
+          createdAt: clientUser.createdAt,
+          updatedAt: clientUser.updatedAt,
+        },
+      };
+    }
+
+    // Se não encontrou usuário cliente, tentar como usuário do sistema
+    console.log('🔍 Tentando usuário do sistema...');
     const user = await this.validateUser(loginDto.email, loginDto.password);
+    
+    console.log('👤 Usuário do sistema encontrado:', !!user);
     
     if (user) {
       if (user.status !== UserStatus.ACTIVE) {
@@ -87,64 +151,7 @@ export class AuthService {
       };
     }
 
-    // Se não encontrou usuário do sistema, tentar como usuário cliente
-    const clientUser = await this.clientUserRepository.findOne({
-      where: { email: loginDto.email },
-      relations: ['client'],
-    });
-
-    if (!clientUser) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
-
-    if (clientUser.status !== ClientUserStatus.ACTIVE) {
-      throw new UnauthorizedException('Usuário não está ativo');
-    }
-
-    // Verificar senha
-    if (!clientUser.password) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
-    
-    const isPasswordValid = await bcrypt.compare(loginDto.password, clientUser.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciais inválidas');
-    }
-
-    // Atualizar último login
-    clientUser.lastLoginAt = new Date();
-    await this.clientUserRepository.save(clientUser);
-
-    // Gerar JWT
-    const payload = {
-      sub: clientUser.id,
-      email: clientUser.email,
-      role: clientUser.role,
-      clientId: clientUser.clientId,
-    };
-
-    const access_token = this.jwtService.sign(payload);
-
-    // Log de auditoria para usuário cliente
-    this.auditService.logLogin(clientUser.id, clientUser.email, 'client', clientUser.clientId, ipAddress, userAgent);
-
-    // Remover senha do retorno
-    const { password, ...userWithoutPassword } = clientUser;
-
-    return {
-      access_token,
-      user: {
-        id: clientUser.id,
-        email: clientUser.email,
-        name: clientUser.name,
-        role: clientUser.role,
-        clientId: clientUser.clientId,
-        status: clientUser.status,
-        lastLogin: clientUser.lastLoginAt,
-        createdAt: clientUser.createdAt,
-        updatedAt: clientUser.updatedAt,
-      },
-    };
+    throw new UnauthorizedException('Credenciais inválidas');
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {

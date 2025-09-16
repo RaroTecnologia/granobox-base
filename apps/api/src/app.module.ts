@@ -20,6 +20,10 @@ import { AuditModule } from './modules/audit/audit.module';
 import { ConfigModule as AppConfigModule } from './modules/config/config.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { ProductsModule } from './modules/products/products.module';
+import { LimitsModule } from './modules/limits/limits.module';
+import { LabelsModule } from './modules/labels/labels.module';
+import { PrintersModule } from './modules/printers/printers.module';
+import { OperatorsModule } from './modules/operators/operators.module';
 
 @Module({
   imports: [
@@ -59,6 +63,10 @@ import { ProductsModule } from './modules/products/products.module';
     EquipmentModule,
     SubscriptionsModule,
     ProductsModule,
+    LimitsModule,
+    LabelsModule,
+    PrintersModule,
+    OperatorsModule,
     AppConfigModule,
   ],
   controllers: [AppController],

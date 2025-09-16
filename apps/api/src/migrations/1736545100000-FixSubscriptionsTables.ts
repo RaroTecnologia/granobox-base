@@ -70,3 +70,4 @@ export class FixSubscriptionsTables1736545100000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "subscriptions" DROP COLUMN IF EXISTS "clientId";`);
   }
 }
+

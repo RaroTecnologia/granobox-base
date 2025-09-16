@@ -10,3 +10,5 @@ export class ForgotPasswordDto {
   @IsEmail({}, { message: 'Email deve ter um formato válido' })
   email: string;
 }
+
+

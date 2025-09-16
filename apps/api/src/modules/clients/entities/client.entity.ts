@@ -132,6 +132,10 @@ export class Client {
   @Column({ nullable: true, type: 'text' })
   notes?: string;
 
+  // Configurações de integração
+  @Column({ nullable: true, length: 255 })
+  tagmentApiKey?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

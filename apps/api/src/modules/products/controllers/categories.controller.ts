@@ -33,9 +33,11 @@ export class CategoriesController {
   @Get()
   @ApiOperation({ summary: 'Get all categories for the authenticated client' })
   @ApiResponse({ status: 200, description: 'Categories retrieved successfully' })
-  async findAll(@Request() req, @Query('rootOnly') rootOnly?: string) {
+  async findAll(@Request() req, @Query('rootOnly') rootOnly?: string, @Query('clientId') clientId?: string) {
     const isRootOnly = rootOnly === 'true';
-    return this.categoriesService.findAll(req.user.clientId, isRootOnly);
+    const targetClientId = clientId || req.user.clientId;
+    console.log('🎯 ClientId sendo usado:', targetClientId);
+    return this.categoriesService.findAll(targetClientId, isRootOnly);
   }
 
   @Get('tree')
@@ -67,3 +69,4 @@ export class CategoriesController {
     return { message: 'Category deleted successfully' };
   }
 }
+

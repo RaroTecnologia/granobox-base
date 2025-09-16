@@ -33,3 +33,5 @@ export class ResetPasswordDto {
   @IsString({ message: 'Confirmação de senha deve ser uma string' })
   confirmPassword: string;
 }
+
+

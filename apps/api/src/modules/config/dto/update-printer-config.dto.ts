@@ -27,3 +27,5 @@ export class UpdatePrinterConfigDto {
   @IsBoolean()
   isActive?: boolean;
 }
+
+

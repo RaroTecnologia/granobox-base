@@ -23,17 +23,17 @@ export class Category {
   isActive: boolean;
 
   @ManyToOne(() => Client, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'client_id' })
+  @JoinColumn({ name: 'clientId' })
   client: Client;
 
-  @Column({ name: 'client_id' })
+  @Column('uuid')
   clientId: string;
 
   @ManyToOne(() => Category, category => category.children, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'parent_id' })
+  @JoinColumn({ name: 'parentId' })
   parent: Category;
 
-  @Column({ name: 'parent_id', nullable: true })
+  @Column('uuid', { nullable: true })
   parentId: string;
 
   @OneToMany(() => Category, category => category.parent)

@@ -9,45 +9,62 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
-  @IsNumber()
-  price?: number;
-
-  @IsOptional()
   @IsString()
-  sku?: string;
+  code?: string;
 
-  @IsOptional()
   @IsString()
-  barcode?: string;
-
-  @IsOptional()
-  @IsNumber()
-  stock?: number;
-
-  @IsOptional()
-  @IsNumber()
-  minStock?: number;
-
-  @IsOptional()
-  @IsString()
-  unit?: string;
+  type: string;
 
   @IsOptional()
   @IsString()
   brand?: string;
 
   @IsOptional()
+  @IsNumber()
+  weight?: number;
+
+  @IsOptional()
   @IsString()
-  model?: string;
+  weightUnit?: string;
 
   @IsOptional()
-  @IsObject()
-  specifications?: Record<string, any>;
+  @IsNumber()
+  salePrice?: number;
 
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  images?: string[];
+  @IsNumber()
+  costPrice?: number;
+
+  @IsString()
+  currency: string;
+
+  @IsOptional()
+  @IsNumber()
+  shelfLifeAmbient?: number;
+
+  @IsOptional()
+  @IsNumber()
+  shelfLifeRefrigerated?: number;
+
+  @IsOptional()
+  @IsNumber()
+  shelfLifeFrozen?: number;
+
+  @IsOptional()
+  @IsString()
+  ingredients?: string;
+
+  @IsOptional()
+  @IsString()
+  allergens?: string;
+
+  @IsOptional()
+  @IsString()
+  nutritionalInfo?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 
   @IsOptional()
   @IsBoolean()
@@ -60,3 +77,5 @@ export class CreateProductDto {
   @IsUUID()
   categoryId?: string;
 }
+
+

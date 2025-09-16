@@ -12,8 +12,53 @@ export class ProductsService {
   ) {}
 
   async create(createProductDto: CreateProductDto): Promise<Product> {
+    // Gerar código automaticamente se não fornecido
+    if (!createProductDto.code) {
+      createProductDto.code = await this.generateNextCode(createProductDto.clientId, createProductDto.type);
+    }
+    
     const product = this.productsRepository.create(createProductDto);
     return this.productsRepository.save(product);
+  }
+
+  private getCodePrefix(productType: string): string {
+    const prefixes = {
+      'raw_material': 'MP',     // Matéria Prima
+      'semi_finished': 'SF',    // Semi Finished
+      'finished': 'PA',         // Produto Acabado
+      'manipulated': 'MAN'      // Manipulado
+    };
+    return prefixes[productType] || 'PRD';
+  }
+
+  private async generateNextCode(clientId: string, productType: string = 'finished'): Promise<string> {
+    const prefix = this.getCodePrefix(productType);
+    
+    // Buscar todos os produtos do cliente para gerar o próximo código
+    const products = await this.productsRepository.find({
+      where: { clientId },
+      select: ['code'],
+    });
+
+    if (products.length === 0) {
+      return `${prefix}001`;
+    }
+
+    // Filtrar códigos que seguem o padrão do tipo atual
+    const pattern = new RegExp(`^${prefix}\\d+$`);
+    const numericCodes = products
+      .map(p => p.code)
+      .filter(code => code && pattern.test(code))
+      .map(code => parseInt(code.replace(prefix, ''), 10))
+      .filter(num => !isNaN(num));
+
+    if (numericCodes.length === 0) {
+      return `${prefix}001`;
+    }
+
+    const maxNumber = Math.max(...numericCodes);
+    const nextNumber = maxNumber + 1;
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
   }
 
   async findAll(clientId: string): Promise<Product[]> {
@@ -61,3 +106,5 @@ export class ProductsService {
       .getMany();
   }
 }
+
+

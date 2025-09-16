@@ -10,54 +10,69 @@ export class Product {
   @Column()
   name: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
-  price: number;
+  @Column({ nullable: true })
+  code: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  sku: string;
+  @Column()
+  type: string;
 
-  @Column({ type: 'varchar', length: 50, nullable: true })
-  barcode: string;
-
-  @Column({ type: 'int', default: 0 })
-  stock: number;
-
-  @Column({ type: 'int', default: 0 })
-  minStock: number;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  unit: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ nullable: true })
   brand: string;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  model: string;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  weight: number;
 
-  @Column({ type: 'json', nullable: true })
-  specifications: Record<string, any>;
+  @Column({ nullable: true })
+  weightUnit: string;
 
-  @Column({ type: 'json', nullable: true })
-  images: string[];
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  salePrice: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  costPrice: number;
+
+  @Column()
+  currency: string;
+
+  @Column({ type: 'int', nullable: true })
+  shelfLifeAmbient: number;
+
+  @Column({ type: 'int', nullable: true })
+  shelfLifeRefrigerated: number;
+
+  @Column({ type: 'int', nullable: true })
+  shelfLifeFrozen: number;
+
+  @Column({ type: 'text', nullable: true })
+  ingredients: string;
+
+  @Column({ type: 'text', nullable: true })
+  allergens: string;
+
+  @Column({ type: 'text', nullable: true })
+  nutritionalInfo: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
 
   @Column({ type: 'boolean', default: true })
   isActive: boolean;
 
   @ManyToOne(() => Client, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'client_id' })
+  @JoinColumn({ name: 'clientId' })
   client: Client;
 
-  @Column({ name: 'client_id' })
+  @Column('uuid')
   clientId: string;
 
   @ManyToOne(() => Category, category => category.products, { onDelete: 'SET NULL', nullable: true })
-  @JoinColumn({ name: 'category_id' })
+  @JoinColumn({ name: 'categoryId' })
   category: Category;
 
-  @Column({ name: 'category_id', nullable: true })
+  @Column('uuid', { nullable: true })
   categoryId: string;
 
   @CreateDateColumn({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

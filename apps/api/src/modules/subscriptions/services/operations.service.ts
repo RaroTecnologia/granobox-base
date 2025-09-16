@@ -12,14 +12,32 @@ export class OperationsService {
   ) {}
 
   async create(createOperationDto: CreateOperationDto): Promise<Operation> {
-    const operation = this.operationsRepository.create(createOperationDto);
+    // Extrair dados de endereço do metadata se existir
+    const { metadata, ...operationData } = createOperationDto;
+    
+    const operation = this.operationsRepository.create({
+      ...operationData,
+      // Mapear campos de endereço do metadata para colunas individuais
+      zipCode: createOperationDto.zipCode || metadata?.address?.zipCode,
+      street: createOperationDto.street || metadata?.address?.street,
+      number: createOperationDto.number || metadata?.address?.number,
+      complement: createOperationDto.complement || metadata?.address?.complement,
+      neighborhood: createOperationDto.neighborhood || metadata?.address?.neighborhood,
+      city: createOperationDto.city || metadata?.address?.city,
+      state: createOperationDto.state || metadata?.address?.state,
+      notes: createOperationDto.notes || metadata?.notes,
+      // Campos de contato
+      contactName: createOperationDto.contactName || metadata?.contact?.name || 'N/A',
+      contactEmail: createOperationDto.contactEmail || metadata?.contact?.email || '',
+      contactPhone: createOperationDto.contactPhone || metadata?.contact?.phone || '',
+      metadata: metadata, // Manter o metadata original
+    });
+    
     return this.operationsRepository.save(operation);
   }
 
   async findAll(clientId?: string): Promise<Operation[]> {
     const query = this.operationsRepository.createQueryBuilder('operation')
-      .leftJoinAndSelect('operation.subscription', 'subscription')
-      .leftJoinAndSelect('subscription.plan', 'plan')
       .orderBy('operation.createdAt', 'DESC');
 
     if (clientId) {
@@ -32,7 +50,6 @@ export class OperationsService {
   async findOne(id: string): Promise<Operation | null> {
     return this.operationsRepository.findOne({
       where: { id },
-      relations: ['subscription', 'subscription.plan', 'client'],
     });
   }
 
@@ -45,3 +62,4 @@ export class OperationsService {
     await this.operationsRepository.delete(id);
   }
 }
+

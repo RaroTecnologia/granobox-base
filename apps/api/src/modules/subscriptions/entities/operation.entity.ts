@@ -8,14 +8,17 @@ export class Operation {
   id: string;
 
   @Column()
+  name: string;
+
+  @Column()
   type: string;
 
   @Column({
     type: 'enum',
-    enum: ['pending', 'completed', 'failed', 'cancelled'],
-    default: 'pending'
+    enum: ['active', 'inactive', 'suspended'],
+    default: 'active'
   })
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  status: 'active' | 'inactive' | 'suspended';
 
   @Column({ type: 'text', nullable: true })
   description: string;
@@ -38,6 +41,44 @@ export class Operation {
   @Column('uuid', { nullable: true })
   subscriptionId: string;
 
+  @Column({ default: true })
+  isActive: boolean;
+
+  // Campos de endereço
+  @Column({ nullable: true })
+  zipCode: string;
+
+  @Column({ nullable: true })
+  street: string;
+
+  @Column({ nullable: true })
+  number: string;
+
+  @Column({ nullable: true })
+  complement: string;
+
+  @Column({ nullable: true })
+  neighborhood: string;
+
+  @Column({ nullable: true })
+  city: string;
+
+  @Column({ nullable: true })
+  state: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
+  // Campos de contato
+  @Column({ nullable: true })
+  contactName: string;
+
+  @Column({ nullable: true })
+  contactEmail: string;
+
+  @Column({ nullable: true })
+  contactPhone: string;
+
   @ManyToOne(() => Client, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'clientId' })
   client: Client;
@@ -52,3 +93,5 @@ export class Operation {
   @UpdateDateColumn()
   updatedAt: Date;
 }
+
+

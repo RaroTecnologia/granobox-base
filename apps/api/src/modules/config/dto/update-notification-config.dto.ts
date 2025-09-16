@@ -24,3 +24,5 @@ export class UpdateNotificationConfigDto {
   @Max(30)
   expirationDays?: number;
 }
+
+

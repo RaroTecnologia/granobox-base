@@ -94,3 +94,4 @@ export class CreateSubscriptionsTables1736545000000 implements MigrationInterfac
     await queryRunner.query(`DROP TABLE "plans"`);
   }
 }
+
