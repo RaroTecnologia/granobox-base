@@ -1,35 +1,29 @@
-import React, { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { useCategories } from '@/hooks/useCategories'
 import { useProducts } from '@/hooks/useProducts'
+import { labelsService } from '@/services/labelsService'
+import { SectionLoading } from '@/components/LoadingSpinner'
+import { ConfirmationModal } from '@/components/ConfirmationModal'
+import { toast } from 'react-hot-toast'
 import { 
   Package, 
-  ChartLine, 
   Warning, 
-  Gear,
   Plus,
   MagnifyingGlass,
-  Funnel,
-  SortAscending,
   Eye,
   PencilSimple,
   Trash,
   CaretRight,
   CaretDown,
-  HandWaving,
-  Barcode,
   TrayArrowDown,
-  Tag,
-  User,
-  Calendar,
-  X,
   Spinner
 } from '@phosphor-icons/react'
 import FooterNavigation from '@/components/FooterNavigation'
-import type { Category, Product } from '@/services/categoriesService'
-import type { ProductType } from '@/services/productsService'
+import type { Category } from '@/services/categoriesService'
+import type { Product, ProductType } from '@/services/productsService'
 import { productsService } from '@/services/productsService'
 
 export default function CadastrosPage() {
@@ -40,6 +34,10 @@ export default function CadastrosPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [showDeleteProductModal, setShowDeleteProductModal] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<{ id: string; name: string } | null>(null)
 
   // Para usuários manager, usar o primeiro cliente disponível
   const clientId = user?.clientId || (user?.role === 'manager' ? '6621e831-5d1d-4801-8c33-b0f93446a3df' : undefined)
@@ -48,18 +46,21 @@ export default function CadastrosPage() {
   const { 
     categories, 
     rootCategories, 
-    isLoading: categoriesLoading, 
+    loading: categoriesLoading, 
     error: categoriesError,
-    getCategoriesByParent 
-  } = useCategories(clientId)
+    getCategoriesByParent,
+    getCategoryById,
+    deleteCategory 
+  } = useCategories()
 
   const { 
     products, 
-    isLoading: productsLoading, 
+    loading: productsLoading, 
     error: productsError,
     applyFilters,
-    getProductsByCategory 
-  } = useProducts(clientId)
+    getProductsByCategory,
+    deleteProduct 
+  } = useProducts()
 
   // Estados de loading e erro
   const isLoading = authLoading || categoriesLoading || productsLoading
@@ -70,13 +71,9 @@ export default function CadastrosPage() {
     ? getProductsByCategory(selectedCategory)
     : products.filter(product => 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.code.toLowerCase().includes(searchTerm.toLowerCase())
+        product.code?.toLowerCase().includes(searchTerm.toLowerCase())
       )
 
-  // Filtrar categorias por busca
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
 
   const toggleCategoryExpansion = (categoryId: string) => {
     const newExpanded = new Set(expandedCategories)
@@ -103,6 +100,78 @@ export default function CadastrosPage() {
 
   const getProductTypeColor = (type: ProductType): string => {
     return productsService.getProductTypeColor(type)
+  }
+
+  const handleDeleteCategory = (categoryId: string, categoryName: string) => {
+    const categoryProducts = getProductsByCategory(categoryId)
+    
+    // Verificar se a categoria tem produtos
+    if (categoryProducts.length > 0) {
+      toast.error(`Não é possível excluir a categoria "${categoryName}" pois ela contém ${categoryProducts.length} produto(s). Remova os produtos primeiro.`)
+      return
+    }
+
+    // Verificar se a categoria tem subcategorias
+    const subcategories = getCategoriesByParent(categoryId)
+    if (subcategories.length > 0) {
+      toast.error(`Não é possível excluir a categoria "${categoryName}" pois ela contém ${subcategories.length} subcategoria(s). Remova as subcategorias primeiro.`)
+      return
+    }
+
+    // Mostrar modal de confirmação
+    setCategoryToDelete({ id: categoryId, name: categoryName })
+    setShowDeleteModal(true)
+  }
+
+  const confirmDeleteCategory = async () => {
+    if (!categoryToDelete) return
+
+    try {
+      await deleteCategory(categoryToDelete.id)
+      
+      // Se a categoria excluída estava selecionada, limpar seleção
+      if (selectedCategory === categoryToDelete.id) {
+        setSelectedCategory(null)
+      }
+    } catch (error) {
+      console.error('Erro ao excluir categoria:', error)
+    }
+  }
+
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    try {
+      // Verificar se o produto tem etiquetas ativas
+      if (clientId) {
+        const allLabels = await labelsService.getAllLabels(clientId)
+        const productLabels = allLabels.filter(label => 
+          label.productId === productId && 
+          label.status !== 'failed' && 
+          !label.metadata?.isUsed
+        )
+        
+        if (productLabels.length > 0) {
+          toast.error(`Não é possível excluir o produto "${productName}" pois ele possui ${productLabels.length} etiqueta(s) ativa(s). Dê baixa nas etiquetas primeiro.`)
+          return
+        }
+      }
+
+      // Mostrar modal de confirmação
+      setProductToDelete({ id: productId, name: productName })
+      setShowDeleteProductModal(true)
+    } catch (error) {
+      console.error('Erro ao verificar etiquetas do produto:', error)
+      toast.error('Erro ao verificar etiquetas do produto. Tente novamente.')
+    }
+  }
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return
+
+    try {
+      await deleteProduct(productToDelete.id)
+    } catch (error) {
+      console.error('Erro ao excluir produto:', error)
+    }
   }
 
   const renderCategoryTree = (parentCategories: Category[], level: number = 0) => {
@@ -147,11 +216,6 @@ export default function CadastrosPage() {
                
                <div>
                  <h3 className="font-medium">{category.name}</h3>
-                 {category.description && (
-                   <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                     {category.description}
-                   </p>
-                 )}
                </div>
              </div>
 
@@ -166,20 +230,47 @@ export default function CadastrosPage() {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation()
+                    handleCategorySelect(category.id)
+                    setActiveTab('produtos')
+                  }}
+                  className={`p-1 rounded hover:bg-blue-100 text-blue-600 hover:text-blue-700 ${
+                    theme === 'dark' ? 'hover:bg-blue-900/20' : ''
+                  }`}
+                  title="Ver produtos desta categoria"
+                >
+                  <Eye size={16} />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigate(`/cadastro/item?categoryId=${category.id}`)
+                  }}
+                  className={`p-1 rounded hover:bg-green-100 text-green-600 hover:text-green-700 ${
+                    theme === 'dark' ? 'hover:bg-green-900/20' : ''
+                  }`}
+                  title="Adicionar produto nesta categoria"
+                >
+                  <Plus size={16} />
+                </button>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
                     navigate(`/cadastro/categoria/${category.id}`)
                   }}
                   className={`p-1 rounded hover:bg-black/10 ${
                     theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'
                   }`}
+                  title="Editar categoria"
                 >
                   <PencilSimple size={16} />
                 </button>
                 <button 
                   onClick={(e) => {
                     e.stopPropagation()
-                    // TODO: Implementar exclusão
+                    handleDeleteCategory(category.id, category.name)
                   }}
                   className="p-1 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
+                  title="Excluir categoria"
                 >
                   <Trash size={16} />
                 </button>
@@ -272,7 +363,7 @@ export default function CadastrosPage() {
           </button>
           <button 
             onClick={() => {
-              // TODO: Implementar exclusão
+              handleDeleteProduct(product.id, product.name)
             }}
             className="p-2 rounded hover:bg-red-100 text-red-600 hover:text-red-700"
             title="Excluir"
@@ -364,97 +455,95 @@ export default function CadastrosPage() {
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900' : 'bg-light-50'}`}>
       {/* Header */}
-      <header className={`sticky top-0 z-40 backdrop-blur-sm border-b ${
-        theme === 'dark' 
-          ? 'bg-dark-950/95 border-dark-800' 
-          : 'bg-white/95 border-light-200'
-      }`}>
-        <div className="px-6 py-4">
+      <header className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b px-4 py-4 sticky top-0 z-10`}>
+        <div>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <Package size={24} weight="duotone" className="text-white" />
+              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                <Package size={24} weight="duotone" className="text-primary" />
               </div>
               <div>
-                <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  Cadastros
-                </h1>
-                <p className="text-primary text-sm">Gerencie seus produtos e categorias</p>
+                <h1 className="text-xl font-bold">Cadastros</h1>
+                <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                  Gerencie categorias e produtos
+                </p>
               </div>
             </div>
 
-            <div className="flex space-x-2">
-              {activeTab === 'categorias' && (
-                <button
-                  onClick={() => navigate('/cadastro/categoria')}
-                  className={`px-4 py-2 rounded-lg border-2 flex items-center space-x-2 transition-colors ${
-                    theme === 'dark' 
-                      ? 'border-dark-600 text-dark-300 hover:border-dark-500 hover:text-white' 
-                      : 'border-light-300 text-dark-600 hover:border-dark-400 hover:text-dark-900'
-                  }`}
-                >
-                  <Plus size={20} />
-                  <span>Nova Categoria</span>
-                </button>
-              )}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate('/cadastro/categoria')}
+                className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={20} />
+                <span>Categoria</span>
+              </button>
               
               <button
                 onClick={() => navigate('/cadastro/item')}
-                className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <Plus size={20} />
-                <span>Novo Produto</span>
+                <span>Produto</span>
               </button>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex space-x-1 mt-4">
-            {[
-              { id: 'categorias', label: 'Categorias', icon: TrayArrowDown },
-              { id: 'produtos', label: 'Produtos', icon: Package },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-primary text-white'
-                    : theme === 'dark'
-                    ? 'text-dark-400 hover:text-white hover:bg-dark-700'
-                    : 'text-dark-600 hover:text-dark-900 hover:bg-light-100'
-                }`}
-              >
-                <tab.icon size={18} weight="duotone" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="mt-4">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder={`Buscar ${activeTab}...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 rounded-lg border transition-colors ${
-                  theme === 'dark'
-                    ? 'bg-dark-700 border-dark-600 text-white placeholder-dark-400 focus:border-primary'
-                    : 'bg-white border-light-300 text-dark-900 placeholder-dark-400 focus:border-primary'
-                } focus:outline-none focus:ring-2 focus:ring-primary/20`}
-              />
-              <MagnifyingGlass size={20} className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
-                theme === 'dark' ? 'text-dark-400' : 'text-dark-500'
-              }`} />
-            </div>
-          </div>
         </div>
       </header>
 
+      {/* Tabs de Navegação */}
+      <div className="px-4 py-4">
+        <div className="flex space-x-2 overflow-x-auto pb-2">
+          <button
+            onClick={() => setActiveTab('categorias')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'categorias'
+                ? 'bg-primary text-white shadow-lg'
+                : theme === 'dark' 
+                  ? 'bg-dark-700 text-dark-300 hover:bg-dark-600' 
+                  : 'bg-light-100 text-dark-600 hover:bg-light-200'
+            }`}
+          >
+            <TrayArrowDown size={18} />
+            <span>Categorias</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('produtos')}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+              activeTab === 'produtos'
+                ? 'bg-primary text-white shadow-lg'
+                : theme === 'dark' 
+                  ? 'bg-dark-700 text-dark-300 hover:bg-dark-600' 
+                  : 'bg-light-100 text-dark-600 hover:bg-light-200'
+            }`}
+          >
+            <Package size={18} />
+            <span>Produtos</span>
+          </button>
+        </div>
+        
+        {/* Search */}
+        <div className="relative mt-4">
+          <MagnifyingGlass size={20} className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${
+            theme === 'dark' ? 'text-dark-400' : 'text-dark-500'
+          }`} />
+          <input
+            type="text"
+            placeholder={`Buscar ${activeTab === 'categorias' ? 'categorias' : 'produtos'}...`}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`w-full pl-10 pr-4 py-2 rounded-lg border transition-colors ${
+              theme === 'dark'
+                ? 'bg-dark-700 border-dark-600 text-white placeholder-dark-400 focus:border-primary'
+                : 'bg-white border-light-300 text-dark-900 placeholder-dark-500 focus:border-primary'
+            } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+          />
+        </div>
+      </div>
+
       {/* Content */}
-      <main className="px-6 py-6 pb-24">
+      <main className="px-4 py-6 pb-24">
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center text-red-700">
@@ -497,7 +586,9 @@ export default function CadastrosPage() {
                   </span>
                 </div>
 
-                 {rootCategories.filter(cat => 
+                 {categoriesLoading ? (
+                   <SectionLoading text="Carregando categorias..." size="lg" />
+                 ) : rootCategories.filter(cat => 
                    cat.name.toLowerCase().includes(searchTerm.toLowerCase())
                  ).length === 0 ? (
                    <div className="text-center py-12">
@@ -521,7 +612,9 @@ export default function CadastrosPage() {
 
             {activeTab === 'produtos' && (
               <div className="space-y-4">
-                {filteredProducts.length === 0 ? (
+                {productsLoading ? (
+                  <SectionLoading text="Carregando produtos..." size="lg" />
+                ) : filteredProducts.length === 0 ? (
                   <div className="text-center py-12">
                     <Package size={48} className={`mx-auto mb-4 ${
                       theme === 'dark' ? 'text-dark-600' : 'text-dark-400'
@@ -550,6 +643,38 @@ export default function CadastrosPage() {
           </>
         )}
       </main>
+
+      {/* Modal de Confirmação de Exclusão - Categoria */}
+      <ConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false)
+          setCategoryToDelete(null)
+        }}
+        onConfirm={confirmDeleteCategory}
+        title="Excluir Categoria"
+        message="Esta ação não pode ser desfeita. Todos os dados relacionados a esta categoria serão perdidos permanentemente."
+        confirmText="Sim, Excluir"
+        cancelText="Cancelar"
+        type="danger"
+        itemName={categoryToDelete?.name}
+      />
+
+      {/* Modal de Confirmação de Exclusão - Produto */}
+      <ConfirmationModal
+        isOpen={showDeleteProductModal}
+        onClose={() => {
+          setShowDeleteProductModal(false)
+          setProductToDelete(null)
+        }}
+        onConfirm={confirmDeleteProduct}
+        title="Excluir Produto"
+        message="Esta ação não pode ser desfeita. O produto será removido permanentemente do sistema. Etiquetas já impressas não serão afetadas."
+        confirmText="Sim, Excluir"
+        cancelText="Cancelar"
+        type="danger"
+        itemName={productToDelete?.name}
+      />
 
       <FooterNavigation />
     </div>

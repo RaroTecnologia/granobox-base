@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { productsService, Product, CreateProductRequest, UpdateProductRequest, ProductFilters } from '../services/productsService';
 import { toast } from 'react-hot-toast';
 
-export function useProducts(clientId?: string, initialFilters: ProductFilters = {}) {
+export function useProducts(initialFilters: ProductFilters = {}) {
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<ProductFilters>({ ...initialFilters, clientId });
+  const [filters, setFilters] = useState<ProductFilters>(initialFilters);
 
   const loadProducts = async (newFilters?: ProductFilters) => {
     const targetFilters = newFilters || filters;
@@ -99,8 +99,12 @@ export function useProducts(clientId?: string, initialFilters: ProductFilters = 
     }
   };
 
-  const getProductById = (id: string): Product | undefined => {
+  const getProductById = useCallback((id: string): Product | undefined => {
     return products.find(product => product.id === id);
+  }, [products]);
+
+  const getProductsByCategory = (categoryId: string): Product[] => {
+    return products.filter(product => product.categoryId === categoryId);
   };
 
   const applyFilters = (newFilters: Partial<ProductFilters>) => {
@@ -126,14 +130,10 @@ export function useProducts(clientId?: string, initialFilters: ProductFilters = 
     loadProducts();
   };
 
-  // Carregar produtos quando o clientId ou filtros mudarem
+  // Carregar produtos quando o componente montar
   useEffect(() => {
-    if (clientId) {
-      const newFilters = { ...filters, clientId };
-      setFilters(newFilters);
-      loadProducts(newFilters);
-    }
-  }, [clientId]);
+    loadProducts();
+  }, []);
 
   return {
     products,
@@ -146,6 +146,7 @@ export function useProducts(clientId?: string, initialFilters: ProductFilters = 
     updateProduct,
     deleteProduct,
     getProductById,
+    getProductsByCategory,
     applyFilters,
     searchProducts,
     refreshProducts,

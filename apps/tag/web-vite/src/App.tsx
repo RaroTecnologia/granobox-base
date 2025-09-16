@@ -9,6 +9,7 @@ import DashboardPage from '@/app/DashboardPage'
 import EtiquetasPage from '@/app/EtiquetasPage'
 import CadastrosPage from '@/app/CadastrosPage'
 import ConfiguracoesPage from '@/app/ConfiguracoesPage'
+import ConfiguracoesImpressorasPage from '@/app/ConfiguracoesImpressorasPage'
 import ConfigurarImpressoraPage from '@/app/ConfigurarImpressoraPage'
 import AdicionarImpressoraPage from '@/app/AdicionarImpressoraPage'
 import NovaEtiquetaPage from '@/app/NovaEtiquetaPage'
@@ -18,12 +19,14 @@ import AlertasPage from '@/app/AlertasPage'
 import EtiquetaDetalhesPage from '@/app/EtiquetaDetalhesPage'
 import CadastroItemPage from '@/app/CadastroItemPage'
 import CadastroCategoriaPage from '@/app/CadastroCategoriaPage'
+import CadastroOperadoresPage from '@/app/CadastroOperadoresPage'
 import ValidadeSelecaoPage from '@/app/ValidadeSelecaoPage'
 import ValidadeImpressaoPage from '@/app/ValidadeImpressaoPage'
 import RotuloSelecaoPage from '@/app/RotuloSelecaoPage'
 import RotuloImpressaoPage from '@/app/RotuloImpressaoPage'
 import PerfilPage from '@/app/PerfilPage'
 import RelatoriosPage from '@/app/RelatoriosPage'
+import RecebimentoPage from '@/app/RecebimentoPage'
 
 const router = createBrowserRouter([
   {
@@ -151,10 +154,26 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/cadastro/operadores",
+    element: (
+      <ProtectedRoute>
+        <CadastroOperadoresPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
     path: "/configuracoes",
     element: (
       <ProtectedRoute>
         <ConfiguracoesPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/configuracoes/impressoras",
+    element: (
+      <ProtectedRoute>
+        <ConfiguracoesImpressorasPage />
       </ProtectedRoute>
     ),
   },
@@ -211,6 +230,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <AlertasPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/recebimento",
+    element: (
+      <ProtectedRoute>
+        <RecebimentoPage />
       </ProtectedRoute>
     ),
   },

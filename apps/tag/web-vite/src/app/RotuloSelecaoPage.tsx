@@ -228,8 +228,8 @@ export default function RotuloSelecaoPage() {
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900' : 'bg-light-50'}`}>
       {/* Header */}
-      <header className={`fixed top-0 left-0 right-0 z-50 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-        <div className="flex items-center justify-between px-6 py-4">
+      <header className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b px-4 py-4 sticky top-0 z-10`}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={handleBack}
@@ -237,8 +237,8 @@ export default function RotuloSelecaoPage() {
             >
               <ArrowLeft size={24} weight="duotone" />
             </button>
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
-              <Package size={24} weight="duotone" className="text-white" />
+            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+              <Package size={24} weight="duotone" className="text-primary" />
             </div>
             <div>
               <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>

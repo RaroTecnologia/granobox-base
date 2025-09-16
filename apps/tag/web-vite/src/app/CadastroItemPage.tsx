@@ -29,7 +29,7 @@ export default function CadastroItemPage() {
 
   // Hooks da API
   const { categories, isLoading: categoriesLoading } = useCategories(clientId)
-  const { getProductById, createProduct, updateProduct, isLoading: productsLoading } = useProducts(clientId)
+  const { products, getProductById, createProduct, updateProduct, isLoading: productsLoading } = useProducts(clientId)
 
   // Estados do formulário
   const [formData, setFormData] = useState<CreateProductRequest>({
@@ -57,10 +57,48 @@ export default function CadastroItemPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isProductLoaded, setIsProductLoaded] = useState(false)
+
+  // Função para obter prefixo baseado no tipo do produto
+  const getCodePrefix = (productType: string): string => {
+    const prefixes = {
+      'raw_material': 'MP',     // Matéria Prima
+      'semi_finished': 'SF',    // Semi Finished
+      'finished': 'PA',         // Produto Acabado
+      'manipulated': 'MAN'      // Manipulado
+    }
+    return prefixes[productType as keyof typeof prefixes] || 'PRD'
+  }
+
+  // Função para gerar próximo código baseado no tipo
+  const generateNextCode = (productType?: string): string => {
+    const currentType = productType || formData.type || 'finished'
+    const prefix = getCodePrefix(currentType)
+    
+    if (!products || products.length === 0) {
+      return `${prefix}001`
+    }
+
+    // Filtrar códigos que seguem o padrão do tipo atual
+    const pattern = new RegExp(`^${prefix}\\d+$`)
+    const numericCodes = products
+      .map(p => p.code)
+      .filter(code => code && pattern.test(code))
+      .map(code => parseInt(code.replace(prefix, ''), 10))
+      .filter(num => !isNaN(num))
+
+    if (numericCodes.length === 0) {
+      return `${prefix}001`
+    }
+
+    const maxNumber = Math.max(...numericCodes)
+    const nextNumber = maxNumber + 1
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`
+  }
 
   // Carregar produto para edição
   useEffect(() => {
-    if (isEditing && id) {
+    if (isEditing && id && !isProductLoaded) {
       const product = getProductById(id)
       if (product) {
         setFormData({
@@ -85,9 +123,10 @@ export default function CadastroItemPage() {
           categoryId: product.categoryId,
           isActive: product.isActive,
         })
+        setIsProductLoaded(true)
       }
     }
-  }, [id, isEditing, getProductById])
+  }, [id, isEditing, isProductLoaded, getProductById]) // Restaurado getProductById (agora estável)
 
   // Definir categoria padrão se vier da URL
   useEffect(() => {
@@ -96,6 +135,28 @@ export default function CadastroItemPage() {
       setFormData(prev => ({ ...prev, categoryId: categoryFromUrl }))
     }
   }, [searchParams, isEditing])
+
+  // Sugerir próximo código automaticamente para novos produtos
+  useEffect(() => {
+    if (!isEditing && products && products.length >= 0) {
+      const suggestedCode = generateNextCode(formData.type)
+      setFormData(prev => ({ ...prev, code: suggestedCode }))
+    }
+  }, [isEditing, products, formData.type])
+
+  // Regenerar código quando o tipo mudar (apenas se não estiver editando)
+  useEffect(() => {
+    if (!isEditing && formData.type && products) {
+      const newCode = generateNextCode(formData.type)
+      // Só atualizar se o código atual segue o padrão antigo ou está vazio
+      const currentPrefix = formData.code ? formData.code.replace(/\d+$/, '') : ''
+      const expectedPrefix = getCodePrefix(formData.type)
+      
+      if (!formData.code || currentPrefix !== expectedPrefix) {
+        setFormData(prev => ({ ...prev, code: newCode }))
+      }
+    }
+  }, [formData.type, isEditing, products])
 
   const handleInputChange = (field: keyof CreateProductRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -161,9 +222,7 @@ export default function CadastroItemPage() {
       newErrors.name = 'Nome é obrigatório'
     }
 
-    if (!formData.code.trim()) {
-      newErrors.code = 'Código é obrigatório'
-    }
+    // Código não é mais obrigatório - será gerado automaticamente se vazio
 
     if (!formData.categoryId) {
       newErrors.categoryId = 'Categoria é obrigatória'
@@ -185,11 +244,17 @@ export default function CadastroItemPage() {
     setIsSubmitting(true)
 
     try {
+      // Gerar código automaticamente se estiver vazio
+      const finalFormData = { ...formData }
+      if (!finalFormData.code.trim()) {
+        finalFormData.code = generateNextCode(finalFormData.type)
+      }
+
       if (isEditing && id) {
-        await updateProduct(id, formData as UpdateProductRequest)
+        await updateProduct(id, finalFormData as UpdateProductRequest)
         toast.success('Produto atualizado com sucesso!')
       } else {
-        await createProduct(formData)
+        await createProduct(finalFormData)
         toast.success('Produto criado com sucesso!')
       }
       
@@ -349,21 +414,38 @@ export default function CadastroItemPage() {
                     <label className={`block text-sm font-medium mb-2 ${
                       theme === 'dark' ? 'text-dark-300' : 'text-dark-700'
                     }`}>
-                      Código *
+                      Código (opcional)
                     </label>
-                    <input
-                      type="text"
-                      value={formData.code}
-                      onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
-                      className={`w-full px-3 py-2 rounded-lg border transition-colors ${
-                        errors.code
-                          ? 'border-red-500 focus:border-red-500'
-                          : theme === 'dark'
-                          ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
-                          : 'bg-white border-light-300 text-dark-900 focus:border-primary'
-                      } focus:outline-none focus:ring-2 focus:ring-primary/20`}
-                      placeholder="Ex: PF001"
-                    />
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={formData.code}
+                        onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
+                        className={`flex-1 px-3 py-2 rounded-lg border transition-colors ${
+                          errors.code
+                            ? 'border-red-500 focus:border-red-500'
+                            : theme === 'dark'
+                            ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
+                            : 'bg-white border-light-300 text-dark-900 focus:border-primary'
+                        } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                        placeholder={`Ex: ${getCodePrefix(formData.type)}001 (será gerado automaticamente)`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newCode = generateNextCode(formData.type)
+                          handleInputChange('code', newCode)
+                        }}
+                        className={`px-3 py-2 rounded-lg border transition-colors ${
+                          theme === 'dark'
+                            ? 'bg-dark-700 border-dark-600 text-dark-300 hover:bg-dark-600'
+                            : 'bg-light-100 border-light-300 text-dark-600 hover:bg-light-200'
+                        }`}
+                        title={`Gerar próximo código ${getCodePrefix(formData.type)}`}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
                     {errors.code && (
                       <p className="text-red-500 text-sm mt-1">{errors.code}</p>
                     )}

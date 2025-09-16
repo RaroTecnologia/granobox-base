@@ -2,23 +2,20 @@ import { useState, useEffect } from 'react';
 import { categoriesService, Category, CreateCategoryRequest, UpdateCategoryRequest } from '../services/categoriesService';
 import { toast } from 'react-hot-toast';
 
-export function useCategories(clientId?: string) {
+export function useCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [rootCategories, setRootCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadCategories = async (id?: string) => {
-    const targetClientId = id || clientId;
-    if (!targetClientId) return;
-
+  const loadCategories = async () => {
     try {
       setLoading(true);
       setError(null);
       
       const [allCategories, rootCats] = await Promise.all([
-        categoriesService.getCategoriesByClient(targetClientId),
-        categoriesService.getRootCategories(targetClientId),
+        categoriesService.getCategoriesByClient(),
+        categoriesService.getRootCategories(),
       ]);
       
       setCategories(allCategories);
@@ -114,17 +111,13 @@ export function useCategories(clientId?: string) {
   };
 
   const refreshCategories = () => {
-    if (clientId) {
-      loadCategories(clientId);
-    }
+    loadCategories();
   };
 
-  // Carregar categorias quando o clientId mudar
+  // Carregar categorias quando o componente montar
   useEffect(() => {
-    if (clientId) {
-      loadCategories(clientId);
-    }
-  }, [clientId]);
+    loadCategories();
+  }, []);
 
   return {
     categories,
@@ -140,3 +133,4 @@ export function useCategories(clientId?: string) {
     refreshCategories,
   };
 }
+

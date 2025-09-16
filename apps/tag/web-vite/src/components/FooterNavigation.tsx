@@ -1,5 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext'
-import { ChartLine, Package, Warning, FileText, Tag } from '@phosphor-icons/react'
+import { ChartLine, Package, Warning, ChartBar, Clock, Truck, Printer } from '@phosphor-icons/react'
 
 export default function FooterNavigation() {
   const { theme } = useTheme()
@@ -19,8 +19,16 @@ export default function FooterNavigation() {
           href="/etiquetas" 
           className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
         >
-          <Tag size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
-          <span className="text-xs">Etiquetas</span>
+          <Clock size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Controle</span>
+        </a>
+        
+        <a 
+          href="/etiquetas/nova" 
+          className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
+        >
+          <Printer size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Imprimir</span>
         </a>
         
         <a 
@@ -29,6 +37,14 @@ export default function FooterNavigation() {
         >
           <Package size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
           <span className="text-xs">Cadastros</span>
+        </a>
+        
+        <a 
+          href="/recebimento" 
+          className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
+        >
+          <Truck size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Recebimento</span>
         </a>
         
         <a 
@@ -43,7 +59,7 @@ export default function FooterNavigation() {
           href="/relatorios" 
           className="flex flex-col items-center space-y-1 text-primary"
         >
-          <FileText size={28} weight="duotone" className="text-primary" />
+          <ChartBar size={28} weight="duotone" className="text-primary" />
           <span className="text-xs">Relatórios</span>
         </a>
       </div>

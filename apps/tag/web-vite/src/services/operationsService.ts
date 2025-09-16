@@ -56,13 +56,14 @@ class OperationsService {
   }
 
   async getOperationsByClient(clientId: string): Promise<Operation[]> {
-    const response = await api.get<Operation[]>(`/operations/client/${clientId}`);
+    const response = await api.get<Operation[]>(`/operations?clientId=${clientId}`);
     return response.data;
   }
 
   async getActiveOperationsByClient(clientId: string): Promise<Operation[]> {
-    const response = await api.get<Operation[]>(`/operations/client/${clientId}/active`);
-    return response.data;
+    const response = await api.get<Operation[]>(`/operations?clientId=${clientId}`);
+    // Filtrar apenas operações ativas no frontend
+    return response.data.filter(op => op.status === 'active' && op.isActive);
   }
 
   async getOperation(id: string): Promise<Operation> {
@@ -111,3 +112,5 @@ class OperationsService {
 }
 
 export const operationsService = new OperationsService();
+
+

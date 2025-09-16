@@ -6,7 +6,8 @@ import {
   Tag, 
   ArrowLeft,
   Clock,
-  Package
+  Package,
+  Printer
 } from '@phosphor-icons/react'
 import FooterNavigation from '@/components/FooterNavigation'
 
@@ -53,10 +54,8 @@ export default function NovaEtiquetaPage() {
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900' : 'bg-light-50'}`}>
       {/* Header Fixo */}
-      <header className={`fixed top-0 left-0 right-0 z-50 backdrop-blur-sm border-b shadow-2xl ${
-        theme === 'dark' ? 'bg-dark-950/95 border-dark-800' : 'bg-white/95 border-light-200'
-      }`}>
-        <div className="flex items-center justify-between px-6 py-4">
+      <header className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b px-4 py-4 sticky top-0 z-10`}>
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <button 
               onClick={() => navigate('/etiquetas')}
@@ -64,19 +63,19 @@ export default function NovaEtiquetaPage() {
             >
               <ArrowLeft size={24} weight="duotone" />
             </button>
-            <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
-              <Tag size={24} weight="duotone" className="text-white" />
+            <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+              <Printer size={24} weight="duotone" className="text-primary" />
             </div>
             <div>
-              <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>Nova Etiqueta</h1>
-              <p className="text-primary text-sm">Selecione o tipo de etiqueta</p>
+              <h1 className="text-xl font-bold">Nova Etiqueta</h1>
+              <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Selecione o tipo de etiqueta</p>
             </div>
           </div>
         </div>
       </header>
 
       {/* Conteúdo Principal */}
-      <main className="pt-32 px-10 py-8">
+      <main className="px-4 py-6">
         <div className="text-center space-y-6 max-w-4xl mx-auto">
           {/* Descrição */}
           <p className={`text-base ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
@@ -88,8 +87,8 @@ export default function NovaEtiquetaPage() {
             {tiposEtiqueta.map((tipo, index) => {
               // Tamanho maior para Validade (core da aplicação)
               const isValidade = tipo.id === 'validade'
-              const cardWidth = isValidade ? 'w-80' : 'w-70'
-              const cardPadding = isValidade ? 'p-10' : 'p-8'
+              const cardWidth = isValidade ? 'w-96' : 'w-80'
+              const cardPadding = isValidade ? 'p-12' : 'p-10'
               
               return (
                 <div
@@ -102,16 +101,16 @@ export default function NovaEtiquetaPage() {
                 >
                   <div className="flex flex-col items-center text-center space-y-4">
                     {/* Ícone do tipo */}
-                    <div className={`w-16 h-16 ${tipo.cor} rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                      <tipo.icon size={32} className="text-white" />
+                    <div className={`${isValidade ? 'w-20 h-20' : 'w-16 h-16'} ${tipo.cor} rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
+                      <tipo.icon size={isValidade ? 40 : 32} className="text-white" />
                     </div>
                     
                     {/* Informações do tipo */}
                     <div>
-                      <h3 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                      <h3 className={`${isValidade ? 'text-3xl' : 'text-2xl'} font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
                         {tipo.nome}
                       </h3>
-                      <p className={`text-base ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                      <p className={`${isValidade ? 'text-lg' : 'text-base'} ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
                         {tipo.descricao}
                       </p>
                     </div>

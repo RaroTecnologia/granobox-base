@@ -1,4 +1,5 @@
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { EtiquetaPreview } from '@/components/EtiquetaPreview'
 import { 
   Plus, 
@@ -19,16 +20,26 @@ import {
   Tag, 
   Package, 
   ChartLine, 
-  Gear 
+  Gear,
+  QrCode,
+  CheckSquare,
+  Snowflake
 } from '@phosphor-icons/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { toast } from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
+import { labelsService, Label } from '@/services/labelsService'
 
 export default function EtiquetasPage() {
   const { theme } = useTheme()
+  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('recentes')
   const [showFiltersModal, setShowFiltersModal] = useState(false)
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [selectedLabel, setSelectedLabel] = useState<Label | null>(null)
+  const [etiquetas, setEtiquetas] = useState<Label[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [advancedFilters, setAdvancedFilters] = useState({
     segmento: [] as string[],
     categoria: '',
@@ -42,85 +53,83 @@ export default function EtiquetasPage() {
     quantidadeMax: ''
   })
 
-  // Dados mockados para demonstração
-  const etiquetas = [
-    {
-      id: 1,
-      codigo: 'ETQ-001',
-      nome: 'Paracetamol 500mg',
-      categoria: 'Medicamentos',
-      segmento: 'Manipulado',
-      status: 'ativa',
-      dataCriacao: '2024-01-15',
-      quantidade: 150,
-      vencimento: '2025-01-15',
-      prioridade: 'alta'
-    },
-    {
-      id: 2,
-      codigo: 'ETQ-002',
-      nome: 'Dipirona 500mg',
-      categoria: 'Medicamentos',
-      segmento: 'Produto Final',
-      status: 'ativa',
-      dataCriacao: '2024-01-16',
-      quantidade: 200,
-      vencimento: '2025-01-16',
-      prioridade: 'média'
-    },
-    {
-      id: 3,
-      codigo: 'ETQ-003',
-      nome: 'Vitamina C 1000mg',
-      categoria: 'Suplementos',
-      segmento: 'Matéria Prima',
-      status: 'inativa',
-      dataCriacao: '2024-01-10',
-      quantidade: 80,
-      vencimento: '2024-12-10',
-      prioridade: 'baixa'
-    },
-    {
-      id: 4,
-      codigo: 'ETQ-004',
-      nome: 'Ibuprofeno 400mg',
-      categoria: 'Medicamentos',
-      segmento: 'Manipulado',
-      status: 'ativa',
-      dataCriacao: '2024-01-17',
-      quantidade: 100,
-      vencimento: '2025-01-17',
-      prioridade: 'média'
-    },
-    {
-      id: 5,
-      codigo: 'ETQ-005',
-      nome: 'Ômega 3 1000mg',
-      categoria: 'Suplementos',
-      segmento: 'Produto Final',
-      status: 'ativa',
-      dataCriacao: '2024-01-18',
-      quantidade: 120,
-      vencimento: '2025-01-18',
-      prioridade: 'baixa'
-    }
-  ]
+  // Carregar etiquetas da API
+  useEffect(() => {
+    const loadLabels = async () => {
+      if (!user?.clientId) return;
+      
+      try {
+        setIsLoading(true);
+        // Carregar todas as etiquetas (impressas e não impressas)
+        const allLabels = await labelsService.getAllLabels(user.clientId);
+        setEtiquetas(allLabels);
+      } catch (error) {
+        console.error('Erro ao carregar etiquetas:', error);
+        toast.error('Erro ao carregar etiquetas');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ativa': return 'bg-green-500/20 text-green-600 border-green-500/30'
-      case 'inativa': return 'bg-gray-500/20 text-gray-600 border-gray-500/30'
-      case 'pendente': return 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+    loadLabels();
+  }, [user?.clientId]);
+
+  // Função para dar baixa na etiqueta via QR Code
+  const handleLowStock = async (labelId: string) => {
+    try {
+      const updatedLabel = await labelsService.markAsUsed(labelId);
+      
+      // Atualizar a lista local
+      setEtiquetas(prev => prev.map(label => 
+        label.id === labelId 
+          ? updatedLabel
+          : label
+      ));
+      
+      toast.success('✅ Baixa realizada com sucesso!');
+      setShowQrModal(false);
+      setSelectedLabel(null);
+    } catch (error) {
+      console.error('Erro ao dar baixa:', error);
+      toast.error('Erro ao dar baixa na etiqueta');
+    }
+  };
+
+  // Função para verificar se a etiqueta foi usada via metadata
+  const isLabelUsed = (label: Label) => {
+    return label.metadata?.isUsed === true;
+  };
+
+  const getStatusColor = (label: Label) => {
+    if (isLabelUsed(label)) return 'bg-blue-500/20 text-blue-600 border-blue-500/30';
+    
+    switch (label.status) {
+      case 'printed': return 'bg-green-500/20 text-green-600 border-green-500/30'
+      case 'pending': return 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+      case 'failed': return 'bg-red-500/20 text-red-600 border-red-500/30'
       default: return 'bg-gray-500/20 text-gray-600 border-gray-500/30'
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'ativa': return <CheckCircle size={16} weight="duotone" />
-      case 'inativa': return <Clock size={16} weight="duotone" />
-      case 'pendente': return <Warning size={16} weight="duotone" />
+  const getStatusIcon = (label: Label) => {
+    if (isLabelUsed(label)) return <CheckSquare size={16} weight="duotone" />;
+    
+    switch (label.status) {
+      case 'printed': return <CheckCircle size={16} weight="duotone" />
+      case 'pending': return <Clock size={16} weight="duotone" />
+      case 'failed': return <Warning size={16} weight="duotone" />
       default: return <Clock size={16} weight="duotone" />
+    }
+  }
+
+  const getStatusText = (label: Label) => {
+    if (isLabelUsed(label)) return 'Utilizada';
+    
+    switch (label.status) {
+      case 'printed': return 'Impressa'
+      case 'pending': return 'Pendente'
+      case 'failed': return 'Falhou'
+      default: return label.status
     }
   }
 
@@ -185,55 +194,51 @@ export default function EtiquetasPage() {
 
   // Filtros aplicados
   const filteredEtiquetas = etiquetas.filter(etiqueta => {
-    const matchesSearch = etiqueta.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         etiqueta.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = etiqueta.product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         etiqueta.id.toLowerCase().includes(searchTerm.toLowerCase())
     
-    // Filtros avançados
-    const matchesSegmento = advancedFilters.segmento.length === 0 || 
-                           advancedFilters.segmento.includes(etiqueta.segmento)
-    
-    const matchesStatus = advancedFilters.status.length === 0 || 
-                         advancedFilters.status.includes(etiqueta.status)
-    
-    const matchesCategoria = advancedFilters.categoria === '' || 
-                            etiqueta.categoria === advancedFilters.categoria
-    
-    const matchesPrioridade = advancedFilters.prioridade === '' || 
-                             etiqueta.prioridade === advancedFilters.prioridade
+    // Filtro de status considerando etiquetas usadas
+    let matchesStatus = true;
+    if (advancedFilters.status.length > 0) {
+      const isUsed = isLabelUsed(etiqueta);
+      matchesStatus = advancedFilters.status.some(status => {
+        if (status === 'used') return isUsed;
+        if (status === 'printed') return etiqueta.status === 'printed' && !isUsed;
+        return etiqueta.status === status && !isUsed;
+      });
+    }
     
     const matchesDataCriacao = (!advancedFilters.dataCriacaoInicio || 
-                               new Date(etiqueta.dataCriacao) >= new Date(advancedFilters.dataCriacaoInicio)) &&
+                               new Date(etiqueta.createdAt) >= new Date(advancedFilters.dataCriacaoInicio)) &&
                               (!advancedFilters.dataCriacaoFim || 
-                               new Date(etiqueta.dataCriacao) <= new Date(advancedFilters.dataCriacaoFim))
+                               new Date(etiqueta.createdAt) <= new Date(advancedFilters.dataCriacaoFim))
     
     const matchesDataVencimento = (!advancedFilters.dataVencimentoInicio || 
-                                  new Date(etiqueta.dataVencimento) >= new Date(advancedFilters.dataVencimentoInicio)) &&
+                                  new Date(etiqueta.validityDate) >= new Date(advancedFilters.dataVencimentoInicio)) &&
                                  (!advancedFilters.dataVencimentoFim || 
-                                  new Date(etiqueta.dataVencimento) <= new Date(advancedFilters.dataVencimentoFim))
+                                  new Date(etiqueta.validityDate) <= new Date(advancedFilters.dataVencimentoFim))
     
     const matchesQuantidade = (!advancedFilters.quantidadeMin || 
-                              etiqueta.quantidade >= parseInt(advancedFilters.quantidadeMin)) &&
+                              etiqueta.quantity >= parseInt(advancedFilters.quantidadeMin)) &&
                              (!advancedFilters.quantidadeMax || 
-                              etiqueta.quantidade <= parseInt(advancedFilters.quantidadeMax))
+                              etiqueta.quantity <= parseInt(advancedFilters.quantidadeMax))
     
-    return matchesSearch && matchesSegmento && matchesStatus && 
-           matchesCategoria && matchesPrioridade && matchesDataCriacao && 
+    return matchesSearch && matchesStatus && matchesDataCriacao && 
            matchesDataVencimento && matchesQuantidade
   })
 
   const sortedEtiquetas = [...filteredEtiquetas].sort((a, b) => {
     switch (sortBy) {
       case 'recentes':
-        return new Date(b.dataCriacao).getTime() - new Date(a.dataCriacao).getTime()
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       case 'antigas':
-        return new Date(a.dataCriacao).getTime() - new Date(b.dataCriacao).getTime()
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       case 'vencimento':
-        return new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()
+        return new Date(a.validityDate).getTime() - new Date(b.validityDate).getTime()
       case 'nome':
-        return a.nome.localeCompare(b.nome)
-      case 'prioridade':
-        const prioridadeOrder = { 'alta': 3, 'média': 2, 'baixa': 1 }
-        return prioridadeOrder[b.prioridade as keyof typeof prioridadeOrder] - prioridadeOrder[a.prioridade as keyof typeof prioridadeOrder]
+        return a.product.name.localeCompare(b.product.name)
+      case 'status':
+        return a.status.localeCompare(b.status)
       default:
         return 0
     }
@@ -248,7 +253,12 @@ export default function EtiquetasPage() {
             <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
               <Tag size={24} weight="duotone" className="text-primary" />
             </div>
-            <h1 className="text-xl font-bold">Gerenciar Etiquetas</h1>
+            <div>
+              <h1 className="text-xl font-bold">Controle de Etiquetas</h1>
+              <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                Gerencie suas etiquetas de validade
+              </p>
+            </div>
           </div>
           <a 
             href="/etiquetas/nova"
@@ -261,9 +271,9 @@ export default function EtiquetasPage() {
       </header>
 
       {/* Conteúdo Principal */}
-      <main className="p-4 space-y-6">
+      <main className="p-4 space-y-6 pb-24">
         {/* Estatísticas Rápidas */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-4 border shadow-xl`}>
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
@@ -271,9 +281,9 @@ export default function EtiquetasPage() {
               </div>
               <div>
                 <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  {etiquetas.filter(e => e.status === 'ativa').length}
+                  {etiquetas.filter(e => e.status === 'printed' && !isLabelUsed(e)).length}
                 </div>
-                <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Ativas</div>
+                <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Impressas</div>
               </div>
             </div>
           </div>
@@ -281,7 +291,21 @@ export default function EtiquetasPage() {
           <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-4 border shadow-xl`}>
             <div className="flex items-center space-x-3">
               <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                <Tag size={20} weight="duotone" className="text-blue-500" />
+                <CheckSquare size={20} weight="duotone" className="text-blue-500" />
+              </div>
+              <div>
+                <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                  {etiquetas.filter(e => isLabelUsed(e)).length}
+                </div>
+                <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Utilizadas</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-4 border shadow-xl`}>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
+                <Tag size={20} weight="duotone" className="text-primary" />
               </div>
               <div>
                 <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
@@ -289,7 +313,7 @@ export default function EtiquetasPage() {
                 </div>
                 <div className={`text-sm text-primary flex items-center justify-center space-x-1`}>
                   <Calendar size={16} weight="duotone" />
-                  <span>Este mês</span>
+                  <span>Total</span>
                 </div>
               </div>
             </div>
@@ -338,7 +362,7 @@ export default function EtiquetasPage() {
               <option value="antigas">Mais Antigas</option>
               <option value="nome">Nome A-Z</option>
               <option value="vencimento">Vencimento</option>
-              <option value="prioridade">Prioridade</option>
+              <option value="status">Status</option>
             </select>
           </div>
 
@@ -354,13 +378,134 @@ export default function EtiquetasPage() {
 
         {/* Lista de Etiquetas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 justify-items-center">
-          {sortedEtiquetas.length > 0 ? (
+          {isLoading ? (
+            // Loading state
+            <div className="col-span-full text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className={`text-lg ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                Carregando etiquetas...
+              </p>
+            </div>
+          ) : sortedEtiquetas.length > 0 ? (
             sortedEtiquetas.map((etiqueta) => {
+              const diasVencimento = calcularDiasVencimento(etiqueta.validityDate);
+              
               return (
-                <EtiquetaPreview 
-                  key={etiqueta.id} 
-                  etiqueta={etiqueta}
-                />
+                <div
+                  key={etiqueta.id}
+                  className={`w-full max-w-sm ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-4 border shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105`}
+                >
+                  {/* Header do Card */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`px-3 py-1 rounded-full border text-xs font-semibold ${getStatusColor(etiqueta)}`}>
+                      <div className="flex items-center space-x-1">
+                        {getStatusIcon(etiqueta)}
+                        <span>{getStatusText(etiqueta)}</span>
+                      </div>
+                    </div>
+                    
+                    {(etiqueta.status === 'printed' || isLabelUsed(etiqueta)) && (
+                      <button
+                        onClick={() => {
+                          setSelectedLabel(etiqueta);
+                          setShowQrModal(true);
+                        }}
+                        className={`p-2 text-white rounded-full transition-colors ${
+                          isLabelUsed(etiqueta) 
+                            ? 'bg-green-500 hover:bg-green-600' 
+                            : 'bg-blue-500 hover:bg-blue-600'
+                        }`}
+                        title={isLabelUsed(etiqueta) ? 'Ver detalhes da baixa' : 'Dar baixa via QR Code'}
+                      >
+                        {isLabelUsed(etiqueta) ? (
+                          <Eye size={16} weight="duotone" />
+                        ) : (
+                          <QrCode size={16} weight="duotone" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Informações do Produto */}
+                  <div className="mb-4">
+                    <h3 className={`text-lg font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                      {etiqueta.product.name}
+                    </h3>
+                    <p className={`text-sm font-mono font-semibold ${theme === 'dark' ? 'text-primary' : 'text-primary'}`}>
+                      {etiqueta.code}
+                    </p>
+                  </div>
+
+                  {/* Detalhes */}
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between items-center">
+                      <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                        Quantidade:
+                      </span>
+                      <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                        {etiqueta.quantity} {etiqueta.unit || 'UN'}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                        Produção:
+                      </span>
+                      <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                        {formatarData(etiqueta.productionDate)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                        Validade:
+                      </span>
+                      <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                        {formatarData(etiqueta.validityDate)}
+                      </span>
+                    </div>
+                    
+                    {/* Só mostra vencimento se a etiqueta não foi utilizada */}
+                    {!isLabelUsed(etiqueta) && (
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                          Vencimento:
+                        </span>
+                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                          {getVencimentoText(diasVencimento)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Data de Baixa - só mostra se foi utilizada */}
+                    {isLabelUsed(etiqueta) && etiqueta.metadata?.usedAt && (
+                      <div className="flex justify-between items-center pt-2 border-t border-gray-200 dark:border-dark-600">
+                        <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                          Baixa realizada:
+                        </span>
+                        <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                          {formatarData(etiqueta.metadata.usedAt)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Conservação */}
+                  {etiqueta.conservationType && (
+                    <div className="flex justify-between items-center">
+                      <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                        Conservação:
+                      </span>
+                      <div className="flex items-center space-x-1">
+                        <Clock size={16} className="text-green-500" />
+                        <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                          {etiqueta.conservationType === 'ambiente' ? 'Ambiente' :
+                           etiqueta.conservationType === 'refrigerado' ? 'Refrigerado' : 'Congelado'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )
             })
           ) : (
@@ -458,11 +603,12 @@ export default function EtiquetasPage() {
                 <label className={`block text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
                   Status
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   {[
-                    { value: 'ativa', icon: CheckCircle, color: 'bg-green-500', description: 'Etiquetas ativas' },
-                    { value: 'inativa', icon: Clock, color: 'bg-gray-500', description: 'Etiquetas inativas' },
-                    { value: 'pendente', icon: Warning, color: 'bg-yellow-500', description: 'Etiquetas pendentes' }
+                    { value: 'printed', icon: CheckCircle, color: 'bg-green-500', description: 'Etiquetas impressas' },
+                    { value: 'used', icon: CheckSquare, color: 'bg-blue-500', description: 'Etiquetas utilizadas' },
+                    { value: 'pending', icon: Clock, color: 'bg-yellow-500', description: 'Etiquetas pendentes' },
+                    { value: 'failed', icon: Warning, color: 'bg-red-500', description: 'Etiquetas com falha' }
                   ].map((status) => (
                     <div
                       key={status.value}
@@ -676,6 +822,88 @@ export default function EtiquetasPage() {
               >
                 Aplicar Filtros
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de QR Code para dar baixa */}
+      {showQrModal && selectedLabel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-2xl max-w-md w-full`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                {isLabelUsed(selectedLabel) ? 'Etiqueta Utilizada' : 'Dar Baixa na Etiqueta'}
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowQrModal(false);
+                  setSelectedLabel(null);
+                }}
+                className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'}`}
+              >
+                <X size={20} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
+              </button>
+            </div>
+            
+            <div className="text-center space-y-4">
+              {/* Informações da Etiqueta */}
+              <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-gray-50'}`}>
+                <h4 className={`font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                  {selectedLabel.product.name}
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>ID:</strong> {selectedLabel.id.slice(0, 8)}...
+                  </p>
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>Quantidade:</strong> {selectedLabel.quantity} {selectedLabel.unit || 'UN'}
+                  </p>
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>Validade:</strong> {formatarData(selectedLabel.validityDate)}
+                  </p>
+                  {isLabelUsed(selectedLabel) && selectedLabel.metadata?.usedAt && (
+                    <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                      <strong>Baixa realizada:</strong> {formatarData(selectedLabel.metadata.usedAt)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* QR Code Placeholder - só mostra se não foi utilizada */}
+              {!isLabelUsed(selectedLabel) && (
+                <div className={`p-8 rounded-xl border-2 border-dashed ${theme === 'dark' ? 'border-dark-600' : 'border-gray-300'}`}>
+                  <QrCode size={64} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-gray-400'}`} />
+                  <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-gray-600'}`}>
+                    Escaneie o QR Code da etiqueta física
+                  </p>
+                  <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-dark-500' : 'text-gray-500'}`}>
+                    Ou clique no botão abaixo para confirmar manualmente
+                  </p>
+                </div>
+              )}
+
+              {/* Botões */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowQrModal(false);
+                    setSelectedLabel(null);
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                >
+                  {isLabelUsed(selectedLabel) ? 'Fechar' : 'Cancelar'}
+                </button>
+                {!isLabelUsed(selectedLabel) && (
+                  <button
+                    onClick={() => handleLowStock(selectedLabel.id)}
+                    className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center space-x-2"
+                  >
+                    <CheckSquare size={16} />
+                    <span>Confirmar Baixa</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

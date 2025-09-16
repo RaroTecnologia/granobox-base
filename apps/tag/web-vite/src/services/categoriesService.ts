@@ -36,13 +36,13 @@ export interface CategoryStats {
 }
 
 class CategoriesService {
-  async getCategoriesByClient(clientId: string): Promise<Category[]> {
-    const response = await api.get<Category[]>(`/categories?clientId=${clientId}`);
+  async getCategoriesByClient(): Promise<Category[]> {
+    const response = await api.get<Category[]>('/categories?clientId=6621e831-5d1d-4801-8c33-b0f93446a3df');
     return response.data;
   }
 
-  async getRootCategories(clientId: string): Promise<Category[]> {
-    const response = await api.get<Category[]>(`/categories?clientId=${clientId}&rootOnly=true`);
+  async getRootCategories(): Promise<Category[]> {
+    const response = await api.get<Category[]>('/categories?clientId=6621e831-5d1d-4801-8c33-b0f93446a3df&rootOnly=true');
     return response.data;
   }
 
@@ -65,8 +65,8 @@ class CategoriesService {
     await api.delete(`/categories/${id}`);
   }
 
-  async getCategoryStats(clientId: string): Promise<CategoryStats> {
-    const response = await api.get<CategoryStats>(`/categories/stats?clientId=${clientId}`);
+  async getCategoryStats(): Promise<CategoryStats> {
+    const response = await api.get<CategoryStats>('/categories/stats?clientId=6621e831-5d1d-4801-8c33-b0f93446a3df');
     return response.data;
   }
 }

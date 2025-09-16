@@ -4,6 +4,8 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfig } from '@/hooks/useConfig'
 import { usePrinters } from '@/hooks/usePrinters'
+import { useOperators } from '@/hooks/useOperators'
+import { useTagment } from '@/hooks/useTagment'
 import { 
   Gear, 
   Printer, 
@@ -24,7 +26,9 @@ import {
   FloppyDisk,
   X,
   Warning,
-  ArrowClockwise
+  ArrowClockwise,
+  Play,
+  MapPin
 } from '@phosphor-icons/react'
 import { toast } from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
@@ -52,9 +56,19 @@ export default function ConfiguracoesPage() {
     uploadLogo
   } = useConfig()
   
-  const { printers, loadPrinters } = usePrinters()
+  const { printers, loadPrinters, updatePrinter, deletePrinter } = usePrinters()
+  const { 
+    printers: tagmentPrinters, 
+    isLoading: isLoadingTagment, 
+    loadPrinters: loadTagmentPrinters,
+    testPrinter: sendTestPrint
+  } = useTagment()
   
-  const [activeTab, setActiveTab] = useState<'impressora' | 'sistema' | 'usuario' | 'usuarios' | 'backup'>('impressora')
+  // Para usuários manager, usar o primeiro cliente disponível
+  const clientId = user?.clientId || (user?.role === 'manager' ? '6621e831-5d1d-4801-8c33-b0f93446a3df' : undefined);
+  const { operators, isLoading: operatorsLoading, createOperator, updateOperator, deleteOperator } = useOperators(clientId)
+  
+  const [activeTab, setActiveTab] = useState<'impressora' | 'sistema' | 'usuario' | 'usuarios' | 'operadores' | 'backup'>('impressora')
   const [editMode, setEditMode] = useState<string | null>(null)
   
   // Estados para formulários
@@ -174,6 +188,28 @@ export default function ConfiguracoesPage() {
 
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
+  
+  // Estados para operadores
+  const [showOperatorModal, setShowOperatorModal] = useState(false)
+  const [editingOperator, setEditingOperator] = useState<any>(null)
+  const [operatorForm, setOperatorForm] = useState({
+    name: '',
+    pin: '',
+    isActive: true
+  })
+
+  // Estados para impressoras
+  const [showPrinterModal, setShowPrinterModal] = useState(false)
+  const [editingPrinter, setEditingPrinter] = useState<any>(null)
+  const [printerForm, setPrinterForm] = useState({
+    location: '',
+    usage: {
+      validity: false,
+      label: false
+    },
+    notes: '',
+    isActive: true
+  })
   const [userFormData, setUserFormData] = useState({
     nome: '',
     email: '',
@@ -427,11 +463,192 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  // Funções para operadores
+  const openOperatorModal = (operator = null) => {
+    if (operator) {
+      setEditingOperator(operator)
+      setOperatorForm({
+        name: operator.name,
+        pin: operator.pin,
+        isActive: operator.isActive
+      })
+    } else {
+      setEditingOperator(null)
+      setOperatorForm({
+        name: '',
+        pin: '',
+        isActive: true
+      })
+    }
+    setShowOperatorModal(true)
+  }
+
+  const closeOperatorModal = () => {
+    setShowOperatorModal(false)
+    setEditingOperator(null)
+    setOperatorForm({
+      name: '',
+      pin: '',
+      isActive: true
+    })
+  }
+
+  const handleOperatorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!operatorForm.name.trim()) {
+      toast.error('Nome é obrigatório')
+      return
+    }
+
+    if (!operatorForm.pin.trim() || operatorForm.pin.length !== 4) {
+      toast.error('PIN deve ter exatamente 4 dígitos')
+      return
+    }
+
+    try {
+      const cleanData = {
+        ...operatorForm,
+        clientId: clientId || ''
+      }
+
+      if (editingOperator) {
+        await updateOperator(editingOperator.id, cleanData)
+        toast.success('Operador atualizado com sucesso!')
+      } else {
+        await createOperator(cleanData)
+        toast.success('Operador criado com sucesso!')
+      }
+      
+      closeOperatorModal()
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao salvar operador')
+    }
+  }
+
+  const handleDeleteOperator = async (operatorId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir este operador?')) {
+      try {
+        await deleteOperator(operatorId)
+        toast.success('Operador excluído com sucesso!')
+      } catch (error: any) {
+        toast.error(error.message || 'Erro ao excluir operador')
+      }
+    }
+  }
+
+  // Funções para impressoras
+  const openPrinterModal = (printer = null) => {
+    if (printer) {
+      setEditingPrinter(printer)
+      setPrinterForm({
+        location: printer.location || '',
+        usage: {
+          validity: printer.usage?.includes('validity') || false,
+          label: printer.usage?.includes('label') || false
+        },
+        notes: printer.notes || '',
+        isActive: printer.isActive
+      })
+    } else {
+      setEditingPrinter(null)
+      setPrinterForm({
+        location: '',
+        usage: {
+          validity: false,
+          label: false
+        },
+        notes: '',
+        isActive: true
+      })
+    }
+    setShowPrinterModal(true)
+  }
+
+  const closePrinterModal = () => {
+    setShowPrinterModal(false)
+    setEditingPrinter(null)
+    setPrinterForm({
+      location: '',
+      usage: {
+        validity: false,
+        label: false
+      },
+      notes: '',
+      isActive: true
+    })
+  }
+
+  const handlePrinterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!printerForm.location.trim()) {
+      toast.error('Localização é obrigatória')
+      return
+    }
+
+    if (!printerForm.usage.validity && !printerForm.usage.label) {
+      toast.error('Selecione pelo menos um tipo de uso')
+      return
+    }
+
+    try {
+      const usageArray = []
+      if (printerForm.usage.validity) usageArray.push('validity')
+      if (printerForm.usage.label) usageArray.push('label')
+
+      const updateData = {
+        location: printerForm.location,
+        usage: usageArray.join(','),
+        notes: printerForm.notes,
+        isActive: printerForm.isActive
+      }
+
+      await updatePrinter(editingPrinter.id, updateData)
+      toast.success('Impressora atualizada com sucesso!')
+      
+      closePrinterModal()
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao atualizar impressora')
+    }
+  }
+
+  const handleDeletePrinter = async (printerId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta impressora?')) {
+      try {
+        await deletePrinter(printerId)
+        toast.success('Impressora excluída com sucesso!')
+      } catch (error: any) {
+        toast.error(error.message || 'Erro ao excluir impressora')
+      }
+    }
+  }
+
+  const handleTestPrint = async (printer: any) => {
+    try {
+      await sendTestPrint(printer.tagmentId)
+      toast.success('Teste de impressão enviado!')
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao enviar teste de impressão')
+    }
+  }
+
+  const handleSyncPrinters = async () => {
+    try {
+      await loadTagmentPrinters()
+      await loadPrinters()
+      toast.success('Impressoras sincronizadas com sucesso!')
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao sincronizar impressoras')
+    }
+  }
+
   const tabs = [
     { id: 'impressora', label: 'Impressoras', icon: Printer },
     { id: 'sistema', label: 'Sistema', icon: Gear },
     { id: 'usuario', label: 'Usuário', icon: User },
     { id: 'usuarios', label: 'Usuários', icon: User },
+    { id: 'operadores', label: 'Operadores', icon: User },
     { id: 'backup', label: 'Backup', icon: Database }
   ]
 
@@ -491,122 +708,142 @@ export default function ConfiguracoesPage() {
         {/* Tab Impressora */}
         {activeTab === 'impressora' && (
           <div className="space-y-6 animate-fade-in-up">
-
-            {/* Lista de Impressoras */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            {/* Cabeçalho com botão de sincronizar */}
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Impressoras Configuradas</h2>
+                <div>
+                  <h2 className="text-xl font-semibold">Impressoras</h2>
+                  <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                    Gerencie suas impressoras conectadas ao Tagment
+                  </p>
+                </div>
                 <button
-                  onClick={() => navigate('/adicionar-impressora')}
-                  className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors flex items-center space-x-2"
+                  onClick={handleSyncPrinters}
+                  className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
                 >
-                  <Plus size={16} />
-                  <span>Adicionar</span>
+                  <ArrowClockwise size={20} />
+                  <span>Sincronizar</span>
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {printers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Printer size={48} className="mx-auto text-gray-400 mb-4" />
-                    <p className="text-gray-500">Nenhuma impressora configurada</p>
-                    <p className="text-sm text-gray-400 mt-2">Clique em "Adicionar" para criar sua primeira impressora</p>
-                  </div>
-                ) : (
-                  printers.map((printer) => {
-                    const getStatusColor = (status: string) => {
-                      switch (status) {
-                        case 'online': return 'bg-green-500'
-                        case 'offline': return 'bg-red-500'
-                        case 'connecting': return 'bg-yellow-500'
-                        default: return 'bg-gray-500'
-                      }
-                    }
-
-                    const getStatusText = (status: string) => {
-                      switch (status) {
-                        case 'online': return 'Online'
-                        case 'offline': return 'Offline'
-                        case 'connecting': return 'Conectando'
-                        default: return 'Desconhecido'
-                      }
-                    }
-
-                    const getStatusTextColor = (status: string) => {
-                      switch (status) {
-                        case 'online': return 'text-green-600'
-                        case 'offline': return 'text-red-600'
-                        case 'connecting': return 'text-yellow-600'
-                        default: return 'text-gray-600'
-                      }
-                    }
-
+              {/* Lista de Impressoras */}
+              {isLoadingTagment ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className={`mt-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>Carregando impressoras...</p>
+                </div>
+              ) : !printers || printers.length === 0 ? (
+                <div className="text-center py-8">
+                  <Printer size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-light-400'}`} />
+                  <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                    Nenhuma impressora configurada
+                  </h3>
+                  <p className={`mb-4 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                    Sincronize com o Tagment para importar suas impressoras
+                  </p>
+                  <button
+                    onClick={handleSyncPrinters}
+                    className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    Sincronizar Impressoras
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {(printers || []).map((printer) => {
+                    // Encontrar a impressora correspondente no Tagment
+                    const tagmentPrinter = (tagmentPrinters || []).find(tp => tp.id === printer.tagmentId)
+                    
                     return (
-                      <div key={printer.id} className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-300'}`}>
+                      <div
+                        key={printer.id}
+                        className={`p-4 rounded-xl border transition-colors ${
+                          theme === 'dark' 
+                            ? 'bg-dark-700 border-dark-600 hover:border-dark-500' 
+                            : 'bg-light-50 border-light-300 hover:border-light-400'
+                        }`}
+                      >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-2 h-2 ${getStatusColor(printer.status)} rounded-full`}></div>
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                              printer.isActive ? 'bg-green-100' : 'bg-red-100'
+                            }`}>
+                              <Printer size={24} className={printer.isActive ? 'text-green-600' : 'text-red-600'} />
+                            </div>
+                            
                             <div>
-                              <p className="font-medium">{printer.name}</p>
-                              <p className="text-sm text-gray-500">
-                                {printer.ip}:{printer.port} - {printer.model}
-                                {printer.location && ` (${printer.location})`}
-                              </p>
+                              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                                {tagmentPrinter?.displayName || tagmentPrinter?.name || printer.tagmentId.slice(0, 8)}
+                              </h3>
+                              <div className="flex items-center space-x-4 mt-1">
+                                {printer.location && (
+                                  <span className={`text-sm flex items-center ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                                    <MapPin size={14} className="mr-1" />
+                                    {printer.location}
+                                  </span>
+                                )}
+                                {tagmentPrinter && (
+                                  <span className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                                    {tagmentPrinter.connection?.host}:{tagmentPrinter.connection?.port}
+                                  </span>
+                                )}
+                              </div>
+                              {printer.usage && (
+                                <div className="flex items-center space-x-2 mt-2">
+                                  {printer.usage.includes('validity') && (
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                      Validade
+                                    </span>
+                                  )}
+                                  {printer.usage.includes('label') && (
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                                      Rótulo
+                                    </span>
+                                  )}
+                                </div>
+              )}
                             </div>
                           </div>
+
                           <div className="flex items-center space-x-2">
-                            <span className={`text-sm font-medium ${getStatusTextColor(printer.status)}`}>
-                              {getStatusText(printer.status)}
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              printer.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {printer.isActive ? 'Ativa' : 'Inativa'}
                             </span>
-                            <button 
-                              onClick={() => navigate(`/configurar-impressora/${printer.id}`)}
-                              className="p-1 hover:bg-gray-100 rounded"
+                            
+                            <button
+                              onClick={() => handleTestPrint(printer)}
+                              className="p-2 rounded-lg transition-colors bg-green-100 text-green-600 hover:bg-green-200"
+                              title="Teste de impressão"
                             >
-                              <PencilSimple size={16} />
+                              <Play size={18} />
+                            </button>
+                            
+                            <button
+                              onClick={() => openPrinterModal(printer)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                theme === 'dark' 
+                                  ? 'hover:bg-dark-600 text-dark-300' 
+                                  : 'hover:bg-light-100 text-dark-600'
+                              }`}
+                            >
+                              <PencilSimple size={18} />
+                            </button>
+                            
+                            <button
+                              onClick={() => handleDeletePrinter(printer.id)}
+                              className="p-2 rounded-lg transition-colors text-red-500 hover:bg-red-50"
+                            >
+                              <Trash size={18} />
                             </button>
                           </div>
                         </div>
                       </div>
                     )
-                  })
-                )}
-              </div>
-
-              {/* Estatísticas */}
-              <div className="mt-6 grid grid-cols-3 gap-4">
-                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                  <p className="text-2xl font-bold text-green-600">
-                    {printers.filter(p => p.status === 'online').length}
-                  </p>
-                  <p className="text-sm text-gray-500">Online</p>
-                </div>
-                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                  <p className="text-2xl font-bold text-red-600">
-                    {printers.filter(p => p.status === 'offline').length}
-                  </p>
-                  <p className="text-sm text-gray-500">Offline</p>
-                </div>
-                <div className={`p-3 rounded-lg text-center ${theme === 'dark' ? 'bg-dark-700' : 'bg-light-100'}`}>
-                  <p className="text-2xl font-bold text-blue-600">{printers.length}</p>
-                  <p className="text-sm text-gray-500">Total</p>
-                </div>
-              </div>
-
-              {/* Botões de Ação */}
-              {editMode === 'impressora' && (
-                <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-                  <button
-                    onClick={handleCancel}
-                    className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-full text-sm font-medium transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={() => handleSave('impressora')}
-                    className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors"
-                  >
-                    Salvar
-                  </button>
+                  })}
                 </div>
               )}
             </div>
@@ -616,7 +853,7 @@ export default function ConfiguracoesPage() {
         {/* Tab Sistema */}
         {activeTab === 'sistema' && (
           <div className="space-y-6 animate-fade-in-up">
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Informações da Empresa</h2>
                 <button
@@ -750,7 +987,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             {/* Seção de Logos */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <h3 className="text-lg font-semibold mb-4">Logos da Empresa</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -899,7 +1136,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             {/* Configurações de Notificações */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <h3 className="text-lg font-semibold mb-4">Notificações</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -977,7 +1214,7 @@ export default function ConfiguracoesPage() {
         {/* Tab Usuário */}
         {activeTab === 'usuario' && (
           <div className="space-y-6 animate-fade-in-up">
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold">Perfil do Usuário</h2>
                 <button
@@ -1105,7 +1342,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             {/* Alterar Senha */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <h3 className="text-lg font-semibold mb-4">Alterar Senha</h3>
               <div className="space-y-4">
                 <div>
@@ -1160,7 +1397,7 @@ export default function ConfiguracoesPage() {
         {activeTab === 'usuarios' && (
           <div className="space-y-6 animate-fade-in-up">
             {/* Cabeçalho com botão de adicionar */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-semibold">Gerenciamento de Usuários</h2>
@@ -1276,7 +1513,7 @@ export default function ConfiguracoesPage() {
             </div>
 
             {/* Seção de Permissões por Nível */}
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <h3 className="text-lg font-semibold mb-4">Níveis de Acesso e Permissões</h3>
               
               <div className="space-y-4">
@@ -1350,10 +1587,120 @@ export default function ConfiguracoesPage() {
           </div>
         )}
 
+        {/* Tab Operadores */}
+        {activeTab === 'operadores' && (
+          <div className="space-y-6 animate-fade-in-up">
+            {/* Cabeçalho com botão de adicionar */}
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold">Operadores</h2>
+                  <p className={`text-sm mt-1 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                    Gerencie os operadores que podem imprimir etiquetas
+                  </p>
+                </div>
+                <button
+                  onClick={() => openOperatorModal()}
+                  className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  <Plus size={20} />
+                  <span>Novo Operador</span>
+                </button>
+              </div>
+
+              {/* Lista de Operadores */}
+              {operatorsLoading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className={`mt-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>Carregando operadores...</p>
+                </div>
+              ) : !operators || operators.length === 0 ? (
+                <div className="text-center py-8">
+                  <User size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-light-400'}`} />
+                  <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                    Nenhum operador cadastrado
+                  </h3>
+                  <p className={`mb-4 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                    Adicione operadores para permitir que imprimam etiquetas
+                  </p>
+                  <button
+                    onClick={() => openOperatorModal()}
+                    className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    Adicionar Primeiro Operador
+                  </button>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {(operators || []).map((operator) => (
+                    <div
+                      key={operator.id}
+                      className={`p-4 rounded-xl border transition-colors ${
+                        theme === 'dark' 
+                          ? 'bg-dark-700 border-dark-600 hover:border-dark-500' 
+                          : 'bg-light-50 border-light-300 hover:border-light-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                            operator.isActive ? 'bg-green-100' : 'bg-red-100'
+                          }`}>
+                            <User size={24} className={operator.isActive ? 'text-green-600' : 'text-red-600'} />
+                          </div>
+                          
+                          <div>
+                            <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                              {operator.name}
+                            </h3>
+                            <div className="flex items-center space-x-4 mt-1">
+                              <span className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                                PIN: ••••
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            operator.isActive 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {operator.isActive ? 'Ativo' : 'Inativo'}
+                          </span>
+                          
+                          <button
+                            onClick={() => openOperatorModal(operator)}
+                            className={`p-2 rounded-lg transition-colors ${
+                              theme === 'dark' 
+                                ? 'hover:bg-dark-600 text-dark-300' 
+                                : 'hover:bg-light-100 text-dark-600'
+                            }`}
+                          >
+                            <PencilSimple size={18} />
+                          </button>
+                          
+                          <button
+                            onClick={() => handleDeleteOperator(operator.id)}
+                            className="p-2 rounded-lg transition-colors text-red-500 hover:bg-red-50"
+                          >
+                            <Trash size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Tab Backup */}
         {activeTab === 'backup' && (
           <div className="space-y-6 animate-fade-in-up">
-            <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 border shadow-xl`}>
+            <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-xl`}>
               <h2 className="text-xl font-semibold mb-6">Backup e Restauração</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1614,6 +1961,229 @@ export default function ConfiguracoesPage() {
                   className="px-4 py-2 bg-primary hover:bg-primary-600 text-white rounded-full text-sm font-medium transition-colors"
                 >
                   {editingUser ? 'Atualizar' : 'Criar'} Usuário
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Impressoras */}
+      {showPrinterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                Configurar Impressora
+              </h3>
+              <button
+                onClick={closePrinterModal}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === 'dark' 
+                    ? 'hover:bg-dark-700 text-dark-300' 
+                    : 'hover:bg-light-100 text-dark-600'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePrinterSubmit} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Localização *
+                </label>
+                <input
+                  type="text"
+                  value={printerForm.location}
+                  onChange={(e) => setPrinterForm(prev => ({ ...prev, location: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
+                      : 'bg-white border-light-300 text-dark-900 focus:border-primary'
+                  } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                  placeholder="Ex: Produção, Expedição, etc."
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Uso da Impressora *
+                </label>
+                <div className="space-y-2">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="usageValidity"
+                      checked={printerForm.usage.validity}
+                      onChange={(e) => setPrinterForm(prev => ({ 
+                        ...prev, 
+                        usage: { ...prev.usage, validity: e.target.checked }
+                      }))}
+                      className="mr-2"
+                    />
+                    <label htmlFor="usageValidity" className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                      Etiquetas de Validade
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="usageLabel"
+                      checked={printerForm.usage.label}
+                      onChange={(e) => setPrinterForm(prev => ({ 
+                        ...prev, 
+                        usage: { ...prev.usage, label: e.target.checked }
+                      }))}
+                      className="mr-2"
+                    />
+                    <label htmlFor="usageLabel" className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                      Rótulos de Produto
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Observações
+                </label>
+                <textarea
+                  value={printerForm.notes}
+                  onChange={(e) => setPrinterForm(prev => ({ ...prev, notes: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
+                      : 'bg-white border-light-300 text-dark-900 focus:border-primary'
+                  } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                  placeholder="Observações sobre a impressora..."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="printerActive"
+                  checked={printerForm.isActive}
+                  onChange={(e) => setPrinterForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                  className="mr-2"
+                />
+                <label htmlFor="printerActive" className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Impressora ativa
+                </label>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closePrinterModal}
+                  className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'border-dark-600 text-dark-300 hover:bg-dark-700'
+                      : 'border-light-300 text-dark-600 hover:bg-light-50'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Salvar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Operadores */}
+      {showOperatorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                {editingOperator ? 'Editar Operador' : 'Novo Operador'}
+              </h3>
+              <button
+                onClick={closeOperatorModal}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === 'dark' 
+                    ? 'hover:bg-dark-700 text-dark-300' 
+                    : 'hover:bg-light-100 text-dark-600'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleOperatorSubmit} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Nome *
+                </label>
+                <input
+                  type="text"
+                  value={operatorForm.name}
+                  onChange={(e) => setOperatorForm(prev => ({ ...prev, name: e.target.value }))}
+                  className={`w-full px-3 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
+                      : 'bg-white border-light-300 text-dark-900 focus:border-primary'
+                  } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                  placeholder="Nome do operador"
+                />
+              </div>
+
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  PIN (4 dígitos) *
+                </label>
+                <input
+                  type="text"
+                  value={operatorForm.pin}
+                  onChange={(e) => setOperatorForm(prev => ({ ...prev, pin: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                  className={`w-full px-3 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-dark-700 border-dark-600 text-white focus:border-primary'
+                      : 'bg-white border-light-300 text-dark-900 focus:border-primary'
+                  } focus:outline-none focus:ring-2 focus:ring-primary/20`}
+                  placeholder="0000"
+                  maxLength={4}
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="operatorActive"
+                  checked={operatorForm.isActive}
+                  onChange={(e) => setOperatorForm(prev => ({ ...prev, isActive: e.target.checked }))}
+                  className="mr-2"
+                />
+                <label htmlFor="operatorActive" className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                  Operador ativo
+                </label>
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeOperatorModal}
+                  className={`flex-1 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'border-dark-600 text-dark-300 hover:bg-dark-700'
+                      : 'border-light-300 text-dark-600 hover:bg-light-50'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  {editingOperator ? 'Atualizar' : 'Criar'}
                 </button>
               </div>
             </form>

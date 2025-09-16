@@ -56,7 +56,7 @@ export default function CadastroCategoriaPage() {
         })
       }
     }
-  }, [id, isEditing, getCategoryById])
+  }, [id, isEditing]) // Removido getCategoryById das dependências
 
   const handleInputChange = (field: keyof CreateCategoryRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))

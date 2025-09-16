@@ -9,7 +9,6 @@ import {
   Users, 
   Printer, 
   Download,
-  ArrowLeft,
   MagnifyingGlass,
   Funnel
 } from '@phosphor-icons/react'
@@ -228,12 +227,6 @@ export default function RelatoriosPage() {
       <header className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b px-4 py-4 sticky top-0 z-10`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <a 
-              href="/dashboard"
-              className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'}`}
-            >
-              <ArrowLeft size={24} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
-            </a>
             <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
               <FileText size={24} weight="duotone" className="text-primary" />
             </div>

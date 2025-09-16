@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { operationsService, Operation, CreateOperationRequest, UpdateOperationRequest } from '../services/operationsService';
 import { toast } from 'react-hot-toast';
 
@@ -32,7 +32,7 @@ export function useOperations() {
     }
   };
 
-  const loadActiveOperations = async (clientId?: string) => {
+  const loadActiveOperations = useCallback(async (clientId?: string) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -55,7 +55,7 @@ export function useOperations() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const createOperation = async (data: CreateOperationRequest): Promise<Operation> => {
     try {

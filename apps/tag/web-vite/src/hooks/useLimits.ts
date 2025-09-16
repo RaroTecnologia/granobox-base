@@ -34,26 +34,14 @@ export function useLimits(clientId?: string) {
   const checkLimitAlerts = (limitsData: PlanLimits) => {
     const { usage, plan } = limitsData;
     
-    // Verificar operações
-    if (limitsService.isCriticalLimit(usage.operations, plan.maxOperations)) {
-      toast.error(`Limite crítico: ${usage.operations}/${plan.maxOperations} operações utilizadas`);
-    } else if (limitsService.isNearLimit(usage.operations, plan.maxOperations)) {
-      toast.warning(`Atenção: ${usage.operations}/${plan.maxOperations} operações utilizadas`);
-    }
+    // Verificar operações (removido toasts chatos)
+    // Os limites ainda são verificados, mas sem notificações intrusivas
     
-    // Verificar etiquetas
-    if (limitsService.isCriticalLimit(usage.labelsThisMonth, plan.maxLabelsPerMonth)) {
-      toast.error(`Limite crítico: ${usage.labelsThisMonth}/${plan.maxLabelsPerMonth} etiquetas utilizadas este mês`);
-    } else if (limitsService.isNearLimit(usage.labelsThisMonth, plan.maxLabelsPerMonth)) {
-      toast.warning(`Atenção: ${usage.labelsThisMonth}/${plan.maxLabelsPerMonth} etiquetas utilizadas este mês`);
-    }
+    // Verificar etiquetas (removido toasts automáticos chatos)
+    // Os limites ainda são verificados e exibidos na interface, mas sem notificações intrusivas
     
-    // Verificar usuários
-    if (limitsService.isCriticalLimit(usage.users, plan.maxUsers)) {
-      toast.error(`Limite crítico: ${usage.users}/${plan.maxUsers} usuários utilizados`);
-    } else if (limitsService.isNearLimit(usage.users, plan.maxUsers)) {
-      toast.warning(`Atenção: ${usage.users}/${plan.maxUsers} usuários utilizados`);
-    }
+    // Verificar usuários (removido toasts automáticos chatos)
+    // Os limites ainda são verificados e exibidos na interface, mas sem notificações intrusivas
   };
 
   const canCreateOperation = async (id?: string): Promise<boolean> => {

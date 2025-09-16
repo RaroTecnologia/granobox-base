@@ -4,9 +4,11 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCategories } from '@/hooks/useCategories'
 import { useProducts } from '@/hooks/useProducts'
-import { MagnifyingGlass, Clock, Plus, Minus, House, Thermometer, Snowflake, ArrowLeft, ArrowRight, Printer } from '@phosphor-icons/react'
+import { MagnifyingGlass, Clock, Plus, Minus, House, Thermometer, Snowflake, ArrowLeft, ArrowRight, Printer, User, CaretDown } from '@phosphor-icons/react'
 import toast from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
+import { labelsService } from '@/services/labelsService'
+import { useOperators, Operator } from '@/hooks/useOperators'
 
 type Step = 'categorias' | 'subcategorias' | 'produtos' | 'configuracao'
 
@@ -27,7 +29,10 @@ export default function ValidadeSelecaoPage() {
   const [quantidade, setQuantidade] = useState(1)
   const [peso, setPeso] = useState('')
   const [unidade, setUnidade] = useState('KG')
+  const [dataManipulacao, setDataManipulacao] = useState(new Date().toISOString().split('T')[0])
   const [dataValidade, setDataValidade] = useState('')
+  const [selectedOperator, setSelectedOperator] = useState<Operator | null>(null)
+  const [showOperatorModal, setShowOperatorModal] = useState(false)
 
   const unidades = ['KG', 'G', 'L', 'ML', 'UN']
 
@@ -35,13 +40,38 @@ export default function ValidadeSelecaoPage() {
   const clientId = user?.clientId || (user?.role === 'manager' ? '6621e831-5d1d-4801-8c33-b0f93446a3df' : undefined)
   const { categories, rootCategories, loading: categoriesLoading } = useCategories(clientId)
   const { products, loading: productsLoading } = useProducts(clientId)
+  const { operators } = useOperators(clientId)
+
+  // Debug dos produtos
+  useEffect(() => {
+    console.log('Produtos carregados:', products);
+    console.log('ClientId:', clientId);
+  }, [products, clientId]);
+
+  // Carregar responsável salvo do localStorage
+  useEffect(() => {
+    const savedOperatorId = localStorage.getItem('selectedOperatorId');
+    if (savedOperatorId && operators.length > 0) {
+      const savedOperator = operators.find(op => op.id === savedOperatorId && op.isActive);
+      if (savedOperator) {
+        setSelectedOperator(savedOperator);
+      }
+    }
+  }, [operators]);
+
+  // Salvar responsável no localStorage quando selecionado
+  useEffect(() => {
+    if (selectedOperator) {
+      localStorage.setItem('selectedOperatorId', selectedOperator.id);
+    }
+  }, [selectedOperator]);
 
   // Calcular subcategorias da categoria selecionada
   const subcategories = selectedCategory 
     ? categories.filter(cat => cat.parentId === selectedCategory.id)
     : []
 
-  // Filtrar produtos da subcategoria selecionada
+  // Filtrar produtos da categoria/subcategoria selecionada
   const categoryProducts = selectedSubcategory 
     ? products.filter(product => 
         product.categoryId === selectedSubcategory.id && 
@@ -51,12 +81,21 @@ export default function ValidadeSelecaoPage() {
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.code?.toLowerCase().includes(searchTerm.toLowerCase())
       )
+    : selectedCategory && !categories.some(cat => cat.parentId === selectedCategory.id)
+    ? products.filter(product => 
+        product.categoryId === selectedCategory.id && 
+        (product.type === 'finished' || product.type === 'manipulated')
+      ).filter(product => 
+        searchTerm === '' || 
+        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.code?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     : []
 
-  // Calcular data de validade automaticamente
+  // Calcular data de validade automaticamente baseada na data de manipulação
   useEffect(() => {
-    if (conservacao) {
-      const hoje = new Date()
+    if (conservacao && dataManipulacao) {
+      const dataBase = new Date(dataManipulacao)
       let diasValidade = 0
       
       switch (conservacao) {
@@ -71,10 +110,10 @@ export default function ValidadeSelecaoPage() {
           break
       }
       
-      const dataFutura = new Date(hoje.getTime() + (diasValidade * 24 * 60 * 60 * 1000))
+      const dataFutura = new Date(dataBase.getTime() + (diasValidade * 24 * 60 * 60 * 1000))
       setDataValidade(dataFutura.toISOString().split('T')[0])
     }
-  }, [conservacao])
+  }, [conservacao, dataManipulacao])
 
   const getConservacaoInfo = (tipo: 'ambiente' | 'refrigerado' | 'congelado') => {
     const info = {
@@ -109,7 +148,7 @@ export default function ValidadeSelecaoPage() {
     if (hasSubcategories) {
       setCurrentStep('subcategorias')
     } else {
-      setSelectedSubcategory(category) // Simular subcategoria selecionada
+      // Para categorias sem subcategorias, ir direto para produtos
       setCurrentStep('produtos')
     }
   }
@@ -121,137 +160,230 @@ export default function ValidadeSelecaoPage() {
   }
 
   const handleSelectProduct = (product: any) => {
+    console.log('Produto selecionado:', product);
+    console.log('ID do produto:', product?.id);
     setSelectedProduct(product)
     setCurrentStep('configuracao')
   }
 
-  const handleAdicionarAFila = () => {
-    if (!selectedProduct || !conservacao) {
-      toast.error('Selecione um produto e tipo de conservação')
+  const handleAdicionarAFila = async () => {
+    console.log('Validações:', {
+      selectedProduct: !!selectedProduct,
+      selectedProductId: selectedProduct?.id,
+      conservacao: !!conservacao,
+      selectedOperator: !!selectedOperator,
+      userClientId: !!user?.clientId,
+      dataValidade: !!dataValidade
+    });
+
+    if (!selectedProduct || !conservacao || !selectedOperator || !user?.clientId) {
+      toast.error('Preencha todos os campos obrigatórios')
       return
     }
 
-    const item = {
-      id: Date.now(),
-      produto: selectedProduct,
-      quantidade,
-      peso,
-      unidade,
-      conservacao,
-      dataValidade,
-      timestamp: new Date()
+    if (!dataManipulacao) {
+      toast.error('Selecione a data de manipulação')
+      return
     }
 
-    const filaAtual = JSON.parse(localStorage.getItem('filaValidadeEtiquetas') || '[]')
-    filaAtual.push(item)
-    localStorage.setItem('filaValidadeEtiquetas', JSON.stringify(filaAtual))
+    if (!dataValidade) {
+      toast.error('Selecione o tipo de conservação para calcular a data de validade')
+      return
+    }
 
-    toast.success('Produto adicionado à fila de impressão!')
-    
-    // Reset form
-    setConservacao(null)
-    setQuantidade(1)
-    setPeso('')
-    setUnidade('KG')
-    setDataValidade('')
-    setSelectedProduct(null)
-    setCurrentStep('produtos')
+    if (!selectedProduct.id) {
+      toast.error('Produto selecionado não possui ID válido')
+      return
+    }
+
+    console.log('Dados da etiqueta:', {
+      type: 'validity',
+      conservationType: conservacao,
+      quantity: quantidade,
+      weight: peso || undefined,
+      unit: unidade || undefined,
+      productionDate: dataManipulacao,
+      validityDate: dataValidade,
+      clientId: user.clientId,
+      productId: selectedProduct.id,
+      notes: undefined,
+      metadata: {
+        conservacao,
+        dataProducao: new Date().toLocaleDateString('pt-BR'),
+      }
+    });
+
+    console.log('selectedProduct:', selectedProduct);
+    console.log('user:', user);
+
+    try {
+      await labelsService.createLabel({
+        type: 'validity',
+        conservationType: conservacao,
+        quantity: quantidade,
+        weight: peso || undefined,
+        unit: unidade || undefined,
+        productionDate: dataManipulacao,
+        validityDate: dataValidade,
+        clientId: user.clientId,
+        productId: selectedProduct.id,
+        notes: undefined,
+        metadata: {
+          conservacao,
+          dataProducao: new Date().toLocaleDateString('pt-BR'),
+        }
+      })
+
+      toast.success('Produto adicionado à fila de impressão!')
+      
+      // Reset form (mantém responsável selecionado)
+      setConservacao(null)
+      setQuantidade(1)
+      setPeso('')
+      setUnidade('KG')
+      setDataManipulacao(new Date().toISOString().split('T')[0])
+      setDataValidade('')
+      setSelectedProduct(null)
+      setCurrentStep('produtos')
+    } catch (error) {
+      console.error('Erro ao adicionar etiqueta:', error);
+      toast.error('Erro ao adicionar etiqueta à fila');
+    }
   }
 
   const handleVerFila = () => {
     navigate('/etiquetas/validade/impressao')
   }
 
+  const handleImprimirAgora = async () => {
+    console.log('Validações:', {
+      selectedProduct: !!selectedProduct,
+      selectedProductId: selectedProduct?.id,
+      conservacao: !!conservacao,
+      selectedOperator: !!selectedOperator,
+      userClientId: !!user?.clientId,
+      dataValidade: !!dataValidade
+    });
+
+    if (!selectedProduct || !conservacao || !selectedOperator || !user?.clientId) {
+      toast.error('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    if (!dataManipulacao) {
+      toast.error('Selecione a data de manipulação')
+      return
+    }
+
+    if (!dataValidade) {
+      toast.error('Selecione o tipo de conservação para calcular a data de validade')
+      return
+    }
+
+    if (!selectedProduct.id) {
+      toast.error('Produto selecionado não possui ID válido')
+      return
+    }
+
+    try {
+      const label = await labelsService.createLabel({
+        type: 'validity',
+        conservationType: conservacao,
+        quantity: quantidade,
+        weight: peso || undefined,
+        unit: unidade || undefined,
+        productionDate: dataManipulacao,
+        validityDate: dataValidade,
+        clientId: user.clientId,
+        productId: selectedProduct.id,
+        notes: undefined,
+        metadata: {
+          conservacao,
+          dataProducao: new Date(dataManipulacao).toLocaleDateString('pt-BR'),
+        }
+      })
+
+      toast.success('Etiqueta criada! Redirecionando para impressão...')
+      
+      // Reset form (mantém responsável selecionado)
+      setConservacao(null)
+      setQuantidade(1)
+      setPeso('')
+      setUnidade('KG')
+      setDataManipulacao(new Date().toISOString().split('T')[0])
+      setDataValidade('')
+      setSelectedProduct(null)
+      setCurrentStep('produtos')
+
+      // Redirecionar para impressão com a etiqueta específica
+      navigate(`/etiquetas/validade/impressao?printNow=${label.id}`)
+    } catch (error) {
+      console.error('Erro ao criar etiqueta:', error);
+      toast.error('Erro ao criar etiqueta para impressão');
+    }
+  }
+
   const renderBreadcrumb = () => {
-    if (currentStep === 'subcategorias' && selectedCategory) {
-      return (
-        <div className={`px-6 py-3 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-          <div className="flex items-center space-x-2 text-sm">
+    // Verificar se a categoria selecionada tem subcategorias
+    const hasSubcategories = selectedCategory ? categories.some(cat => cat.parentId === selectedCategory.id) : false
+    
+    return (
+      <div className="px-6 py-4">
+        <div className="flex items-center space-x-2 text-sm">
+          <button onClick={() => navigate('/etiquetas')} className="text-primary hover:underline">
+            Etiquetas
+          </button>
+          <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>&gt;</span>
+          <button onClick={() => navigate('/etiquetas/nova')} className="text-primary hover:underline">
+            Nova Etiqueta
+          </button>
+          <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>&gt;</span>
+          {currentStep === 'categorias' ? (
+            <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>Validade</span>
+          ) : (
             <button onClick={() => setCurrentStep('categorias')} className="text-primary hover:underline">
-              Categorias
+              Validade
             </button>
-            <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-            <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedCategory.name}</span>
-          </div>
+          )}
+          
+          {/* Mostrar categoria sempre que selecionada */}
+          {selectedCategory && (
+            <>
+              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>&gt;</span>
+              {(currentStep === 'subcategorias' || (currentStep === 'produtos' && !hasSubcategories)) ? (
+                <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedCategory.name}</span>
+              ) : (
+                <button onClick={() => setCurrentStep(hasSubcategories ? 'subcategorias' : 'produtos')} className="text-primary hover:underline">
+                  {selectedCategory.name}
+                </button>
+              )}
+            </>
+          )}
+          
+          {/* Mostrar subcategoria apenas se existe */}
+          {selectedSubcategory && currentStep !== 'subcategorias' && (
+            <>
+              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>&gt;</span>
+              {currentStep === 'produtos' ? (
+                <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedSubcategory.name}</span>
+              ) : (
+                <button onClick={() => setCurrentStep('produtos')} className="text-primary hover:underline">
+                  {selectedSubcategory.name}
+                </button>
+              )}
+            </>
+          )}
+          
+          {/* Mostrar produto selecionado na configuração */}
+          {selectedProduct && currentStep === 'configuracao' && (
+            <>
+              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>&gt;</span>
+              <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>Configurar</span>
+            </>
+          )}
         </div>
-      )
-    }
-
-    if (currentStep === 'produtos' && selectedCategory && selectedSubcategory) {
-      const isDirectCategory = selectedCategory.id === selectedSubcategory.id
-      if (isDirectCategory) {
-        return (
-          <div className={`px-6 py-3 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-            <div className="flex items-center space-x-2 text-sm">
-              <button onClick={() => setCurrentStep('categorias')} className="text-primary hover:underline">
-                Categorias
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedCategory.name}</span>
-            </div>
-          </div>
-        )
-      } else {
-        return (
-          <div className={`px-6 py-3 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-            <div className="flex items-center space-x-2 text-sm">
-              <button onClick={() => setCurrentStep('categorias')} className="text-primary hover:underline">
-                Categorias
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <button onClick={() => setCurrentStep('subcategorias')} className="text-primary hover:underline">
-                {selectedCategory.name}
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedSubcategory.name}</span>
-            </div>
-          </div>
-        )
-      }
-    }
-
-    if (currentStep === 'configuracao' && selectedProduct) {
-      const isDirectCategory = selectedCategory?.id === selectedSubcategory?.id
-      if (isDirectCategory) {
-        return (
-          <div className={`px-6 py-3 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-            <div className="flex items-center space-x-2 text-sm">
-              <button onClick={() => setCurrentStep('categorias')} className="text-primary hover:underline">
-                Categorias
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <button onClick={() => setCurrentStep('produtos')} className="text-primary hover:underline">
-                {selectedCategory?.name}
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedProduct.name}</span>
-            </div>
-          </div>
-        )
-      } else {
-        return (
-          <div className={`px-6 py-3 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-b`}>
-            <div className="flex items-center space-x-2 text-sm">
-              <button onClick={() => setCurrentStep('categorias')} className="text-primary hover:underline">
-                Categorias
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <button onClick={() => setCurrentStep('subcategorias')} className="text-primary hover:underline">
-                {selectedCategory?.name}
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <button onClick={() => setCurrentStep('produtos')} className="text-primary hover:underline">
-                {selectedSubcategory?.name}
-              </button>
-              <span className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}>/</span>
-              <span className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>{selectedProduct.name}</span>
-            </div>
-          </div>
-        )
-      }
-    }
-
-    return null
+      </div>
+    )
   }
 
   if (categoriesLoading || productsLoading) {
@@ -306,10 +438,12 @@ export default function ValidadeSelecaoPage() {
       </header>
 
       {/* Breadcrumb */}
-      {renderBreadcrumb()}
+      <div className="pt-20">
+        {renderBreadcrumb()}
+      </div>
 
       {/* Conteúdo Principal */}
-      <main className="pt-32 px-6 py-8 pb-32">
+      <main className="pt-4 px-6 py-4 pb-40">
         {/* Busca (apenas nas telas de produtos) */}
         {currentStep === 'produtos' && (
           <div className="mb-6 max-w-md mx-auto">
@@ -331,8 +465,8 @@ export default function ValidadeSelecaoPage() {
 
         {/* Conteúdo baseado no step atual */}
         {currentStep === 'categorias' && (
-          <div className="max-w-4xl mx-auto">
-            <h2 className={`text-xl font-semibold mb-6 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+          <div className="max-w-4xl mx-auto mt-8">
+            <h2 className={`text-2xl font-semibold mb-10 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
               Selecione uma Categoria
             </h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -360,8 +494,8 @@ export default function ValidadeSelecaoPage() {
         )}
 
         {currentStep === 'subcategorias' && (
-          <div className="max-w-4xl mx-auto">
-            <h2 className={`text-xl font-semibold mb-6 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+          <div className="max-w-4xl mx-auto mt-8">
+            <h2 className={`text-2xl font-semibold mb-10 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
               Selecione uma Subcategoria
             </h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -389,8 +523,8 @@ export default function ValidadeSelecaoPage() {
         )}
 
         {currentStep === 'produtos' && (
-          <div className="max-w-4xl mx-auto">
-            <h2 className={`text-xl font-semibold mb-6 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+          <div className="max-w-4xl mx-auto mt-8">
+            <h2 className={`text-2xl font-semibold mb-10 text-center ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
               Selecione um Produto
             </h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -421,7 +555,7 @@ export default function ValidadeSelecaoPage() {
 
         {/* Tela de Configuração - Exatamente como no Flutter */}
         {currentStep === 'configuracao' && selectedProduct && (
-          <div className="max-w-2xl mx-auto space-y-5">
+          <div className="max-w-2xl mx-auto space-y-4 mb-8 mt-8">
             {/* Título do produto - Como no Flutter */}
             <div className="space-y-1">
               <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
@@ -430,6 +564,81 @@ export default function ValidadeSelecaoPage() {
               <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
                 Código: {selectedProduct.code}
               </p>
+            </div>
+
+            {/* Responsável - Igual ao Flutter */}
+            <div>
+              <button
+                onClick={() => setShowOperatorModal(true)}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedOperator
+                    ? 'border-primary bg-primary/10'
+                    : theme === 'dark'
+                    ? 'border-dark-600 bg-dark-700'
+                    : 'border-light-300 bg-light-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <User 
+                      size={20} 
+                      className={selectedOperator ? 'text-primary' : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} 
+                    />
+                    <div className="text-left">
+                      <div className={`font-semibold ${
+                        selectedOperator 
+                          ? 'text-primary' 
+                          : theme === 'dark' ? 'text-primary' : 'text-primary'
+                      }`}>
+                        Responsável
+                      </div>
+                      <div className={`text-sm ${
+                        selectedOperator 
+                          ? theme === 'dark' ? 'text-white' : 'text-dark-900'
+                          : theme === 'dark' ? 'text-dark-400' : 'text-dark-600'
+                      }`}>
+                        {selectedOperator ? selectedOperator.name : 'Selecione o responsável'}
+                      </div>
+                    </div>
+                  </div>
+                  <CaretDown 
+                    size={16} 
+                    className={selectedOperator ? 'text-primary' : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} 
+                  />
+                </div>
+              </button>
+            </div>
+
+            {/* Data de Manipulação */}
+            <div className={`p-3 ${theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-300'} border rounded-xl`}>
+              <h4 className={`text-sm font-medium mb-3 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                Data de Manipulação *
+              </h4>
+              <input
+                type="date"
+                value={dataManipulacao}
+                onChange={(e) => setDataManipulacao(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className={`w-full px-4 py-3 rounded-lg border ${
+                  theme === 'dark'
+                    ? 'bg-dark-800 border-dark-600 text-white'
+                    : 'bg-white border-light-300 text-dark-900'
+                } focus:ring-2 focus:ring-primary focus:border-primary`}
+              />
+            </div>
+
+            {/* Data de Validade */}
+            <div className={`p-3 ${theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-300'} border rounded-xl`}>
+              <h4 className={`text-sm font-medium mb-3 ${theme === 'dark' ? 'text-dark-300' : 'text-dark-700'}`}>
+                Data de Validade *
+              </h4>
+              <div className={`w-full px-4 py-3 rounded-lg border ${
+                theme === 'dark'
+                  ? 'bg-dark-600 border-dark-500 text-dark-300'
+                  : 'bg-gray-100 border-gray-300 text-gray-600'
+              } cursor-not-allowed`}>
+                {dataValidade ? new Date(dataValidade).toLocaleDateString('pt-BR') : 'Selecione o tipo de conservação'}
+              </div>
             </div>
 
             {/* Tipo de Conservação - Exatamente como no Flutter */}
@@ -537,23 +746,123 @@ export default function ValidadeSelecaoPage() {
               </div>
             </div>
 
-            {/* Botão Adicionar à Fila - Como no Flutter */}
-            <div className={`fixed bottom-20 left-0 right-0 p-5 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-t`}>
-              <button
-                onClick={handleAdicionarAFila}
-                disabled={!selectedProduct || !conservacao}
-                className={`w-full py-4 rounded-xl font-medium transition-all ${
-                  !selectedProduct || !conservacao
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-primary text-white hover:bg-primary/90'
-                }`}
-              >
-                Adicionar à Fila de Impressão
-              </button>
+            {/* Botões de Ação - Como no Flutter */}
+            <div className={`fixed bottom-16 left-0 right-0 p-4 ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-t shadow-lg`}>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleAdicionarAFila}
+                  disabled={!selectedProduct || !conservacao || !selectedOperator || !dataManipulacao || !dataValidade || !selectedProduct?.id}
+                  className={`flex-1 py-4 rounded-xl font-medium transition-all border-2 flex items-center justify-center space-x-2 ${
+                    !selectedProduct || !conservacao || !selectedOperator || !dataManipulacao || !dataValidade || !selectedProduct?.id
+                      ? 'border-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'border-primary text-primary hover:bg-primary hover:text-white'
+                  }`}
+                >
+                  <Plus size={20} />
+                  <span>Adicionar à Fila</span>
+                </button>
+                <button
+                  onClick={handleImprimirAgora}
+                  disabled={!selectedProduct || !conservacao || !selectedOperator || !dataManipulacao || !dataValidade || !selectedProduct?.id}
+                  className={`flex-1 py-4 rounded-xl font-medium transition-all flex items-center justify-center space-x-2 ${
+                    !selectedProduct || !conservacao || !selectedOperator || !dataManipulacao || !dataValidade || !selectedProduct?.id
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  <Printer size={20} />
+                  <span>Imprimir Agora</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Modal de Seleção de Responsável */}
+      {showOperatorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                Selecionar Responsável
+              </h2>
+              <button
+                onClick={() => setShowOperatorModal(false)}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === 'dark' 
+                    ? 'hover:bg-dark-700 text-dark-300' 
+                    : 'hover:bg-light-100 text-dark-600'
+                }`}
+              >
+                ×
+              </button>
+            </div>
+
+            {operators.filter(op => op.isActive).length === 0 ? (
+              <div className="text-center py-8">
+                <User size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-light-400'}`} />
+                <p className={`${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} mb-4`}>
+                  Nenhum operador cadastrado
+                </p>
+                <button
+                  onClick={() => {
+                    setShowOperatorModal(false)
+                    navigate('/cadastro/operadores')
+                  }}
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Cadastrar Operadores
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {operators.filter(op => op.isActive).map((operator) => (
+                  <button
+                    key={operator.id}
+                    onClick={() => {
+                      setSelectedOperator(operator);
+                      setShowOperatorModal(false);
+                      toast.success(`Responsável selecionado: ${operator.name}`);
+                    }}
+                    className={`w-full p-4 rounded-xl border transition-colors text-left ${
+                      selectedOperator?.id === operator.id
+                        ? 'border-primary bg-primary/10'
+                        : theme === 'dark'
+                        ? 'border-dark-600 hover:border-dark-500'
+                        : 'border-light-300 hover:border-light-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedOperator?.id === operator.id ? 'bg-primary text-white' : 'bg-green-100'
+                        }`}>
+                          <User size={20} className={selectedOperator?.id === operator.id ? 'text-white' : 'text-green-600'} />
+                        </div>
+                        <div>
+                          <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                            {operator.name}
+                          </h3>
+                          {operator.department && (
+                            <p className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                              {operator.department}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {selectedOperator?.id === operator.id && (
+                        <div className="text-primary">✓</div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Footer Navigation */}
       <FooterNavigation />
