@@ -58,4 +58,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Comando de inicialização com dumb-init para gerenciamento de processos
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/src/main.js"]
+CMD ["node", "dist/main.js"]
