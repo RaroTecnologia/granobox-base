@@ -72,14 +72,14 @@ npm run typeorm:migration:run
 
 ### URLs da API:
 - **Base:** `https://api.granobox.com`
-- **Health Check:** `https://api.granobox.com/api/health`
+- **Health Check:** `https://api.granobox.com/health`
 - **Documentação:** `https://api.granobox.com/api/docs`
 - **Login:** `https://api.granobox.com/auth/login`
 
 ## 🏥 Monitoramento
 
 ### Health Check
-- **Endpoint:** `/api/health`
+- **Endpoint:** `/health`
 - **Método:** GET
 - **Resposta esperada:** `{"status": "ok", "timestamp": "...", "uptime": 3600}`
 

@@ -10,8 +10,8 @@ WORKDIR /app
 # Copiar arquivos de dependências
 COPY package*.json ./
 
-# Instalar dependências
-RUN npm ci --only=production && npm cache clean --force
+# Instalar todas as dependências (incluindo dev) para o build
+RUN npm ci && npm cache clean --force
 
 # Copiar código fonte
 COPY . .
@@ -32,10 +32,12 @@ RUN addgroup -g 1001 -S nodejs && \
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Copiar node_modules e build da etapa anterior
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+# Copiar package.json e instalar apenas dependências de produção
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+# Copiar build da etapa anterior
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 
 # Criar diretório de uploads se necessário
 RUN mkdir -p uploads && chown -R nestjs:nodejs uploads
@@ -52,8 +54,8 @@ ENV PORT=3001
 
 # Health check - verificar se a API está respondendo
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })" || exit 1
+  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })" || exit 1
 
 # Comando de inicialização com dumb-init para gerenciamento de processos
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

@@ -48,7 +48,7 @@ max_attempts=30
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
-    if curl -f http://localhost:3001/api/health > /dev/null 2>&1; then
+    if curl -f http://localhost:3001/health > /dev/null 2>&1; then
         print_status "✅ API está rodando em http://localhost:3001"
         break
     fi
