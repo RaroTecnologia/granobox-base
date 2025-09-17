@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
       context: .
     domains:
-      - host: api.granobox.com  # Substitua pelo seu domínio
+      - host: api.granobox.com.br  # Substitua pelo seu domínio
     env:
       - name: NODE_ENV
         value: production

@@ -28,9 +28,9 @@ async function bootstrap() {
         'http://localhost:5174', 
         'http://localhost:5173', 
         'http://localhost:5175',
-        'https://granobox.com',
-        'https://www.granobox.com',
-        'https://app.granobox.com'
+        'https://granobox.com.br',
+        'https://www.granobox.com.br',
+        'https://app.granobox.com.br'
       ];
 
   app.enableCors({

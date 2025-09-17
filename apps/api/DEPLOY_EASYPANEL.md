@@ -21,7 +21,7 @@ JWT_SECRET=sua-chave-jwt-super-segura-aqui-min-32-caracteres
 JWT_EXPIRES_IN=7d
 
 # CORS (domínios permitidos)
-CORS_ORIGINS=https://granobox.com,https://www.granobox.com,https://app.granobox.com
+CORS_ORIGINS=https://granobox.com.br,https://www.granobox.com.br,https://app.granobox.com.br
 
 # Senha do PostgreSQL
 POSTGRES_PASSWORD=sua-senha-super-segura
@@ -71,10 +71,10 @@ npm run typeorm:migration:run
 - **Storage:** 1GB para aplicação + volume para banco
 
 ### URLs da API:
-- **Base:** `https://api.granobox.com`
-- **Health Check:** `https://api.granobox.com/health`
-- **Documentação:** `https://api.granobox.com/api/docs`
-- **Login:** `https://api.granobox.com/auth/login`
+- **Base:** `https://api.granobox.com.br`
+- **Health Check:** `https://api.granobox.com.br/health`
+- **Documentação:** `https://api.granobox.com.br/api/docs`
+- **Login:** `https://api.granobox.com.br/auth/login`
 
 ## 🏥 Monitoramento
 
