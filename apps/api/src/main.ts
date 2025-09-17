@@ -19,8 +19,19 @@ async function bootstrap() {
   );
 
   // CORS
+  const corsOrigins = process.env.CORS_ORIGINS 
+    ? process.env.CORS_ORIGINS.split(',')
+    : [
+        'http://localhost:5174', 
+        'http://localhost:5173', 
+        'http://localhost:5175',
+        'https://granobox.com',
+        'https://www.granobox.com',
+        'https://app.granobox.com'
+      ];
+
   app.enableCors({
-    origin: ['http://localhost:5174', 'http://localhost:5173', 'http://localhost:5175'],
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

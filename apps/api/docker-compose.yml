@@ -1,0 +1,47 @@
+# Docker Compose para API do Granobox
+version: '3.8'
+
+services:
+  # API do Granobox
+  granobox-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://granobox:granobox123@granobox-db:5432/granobox
+      - JWT_SECRET=sua-chave-jwt-super-segura-aqui
+      - JWT_EXPIRES_IN=7d
+    depends_on:
+      - granobox-db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Banco de dados PostgreSQL
+  granobox-db:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=granobox
+      - POSTGRES_USER=granobox
+      - POSTGRES_PASSWORD=granobox123
+    volumes:
+      - granobox-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U granobox -d granobox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  granobox-db-data:

@@ -26,6 +26,7 @@ import { PrintersModule } from './modules/printers/printers.module';
 import { OperatorsModule } from './modules/operators/operators.module';
 import { StorageLocationsModule } from './modules/storage-locations/storage-locations.module';
 import { TagmentModule } from './modules/tagment/tagment.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { TagmentModule } from './modules/tagment/tagment.module';
     StorageLocationsModule,
     TagmentModule,
     AppConfigModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
