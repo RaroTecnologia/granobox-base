@@ -10,6 +10,9 @@ export interface Product {
   categoryId: string;
   clientId: string;
   isActive: boolean;
+  shelfLifeAmbient?: number;
+  shelfLifeRefrigerated?: number;
+  shelfLifeFrozen?: number;
   createdAt: string;
   updatedAt: string;
   category?: {

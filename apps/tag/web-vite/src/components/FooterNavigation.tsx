@@ -16,14 +16,6 @@ export default function FooterNavigation() {
         </a>
         
         <a 
-          href="/etiquetas" 
-          className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
-        >
-          <Clock size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
-          <span className="text-xs">Controle</span>
-        </a>
-        
-        <a 
           href="/etiquetas/nova" 
           className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
         >
@@ -32,11 +24,19 @@ export default function FooterNavigation() {
         </a>
         
         <a 
-          href="/cadastros" 
+          href="/etiquetas" 
           className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
         >
-          <Package size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
-          <span className="text-xs">Cadastros</span>
+          <Clock size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Controle</span>
+        </a>
+        
+        <a 
+          href="/alertas" 
+          className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
+        >
+          <Warning size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Alertas</span>
         </a>
         
         <a 
@@ -48,11 +48,11 @@ export default function FooterNavigation() {
         </a>
         
         <a 
-          href="/alertas" 
+          href="/cadastros" 
           className={`flex flex-col items-center space-y-1 ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'} transition-colors`}
         >
-          <Warning size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
-          <span className="text-xs">Alertas</span>
+          <Package size={28} weight="duotone" className={`${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`} />
+          <span className="text-xs">Cadastros</span>
         </a>
         
         <a 

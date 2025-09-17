@@ -15,6 +15,7 @@ export interface Label {
   validityDate: string;
   clientId: string;
   productId: string;
+  storageLocationId?: string;
   notes?: string;
   metadata?: Record<string, any>;
   qrCode?: string;
@@ -42,6 +43,7 @@ export interface CreateLabelRequest {
   validityDate: string;
   clientId: string;
   productId: string;
+  storageLocationId?: string;
   notes?: string;
   metadata?: Record<string, any>;
 }

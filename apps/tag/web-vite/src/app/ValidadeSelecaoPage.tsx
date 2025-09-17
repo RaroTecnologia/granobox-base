@@ -4,11 +4,14 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCategories } from '@/hooks/useCategories'
 import { useProducts } from '@/hooks/useProducts'
-import { MagnifyingGlass, Clock, Plus, Minus, House, Thermometer, Snowflake, ArrowLeft, ArrowRight, Printer, User, CaretDown } from '@phosphor-icons/react'
+import { MagnifyingGlass, Clock, Plus, Minus, House, Thermometer, Snowflake, ArrowLeft, ArrowRight, Printer, User, CaretDown, MapPin } from '@phosphor-icons/react'
 import toast from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
+import { PageLoading } from '@/components/LoadingSpinner'
 import { labelsService } from '@/services/labelsService'
 import { useOperators, Operator } from '@/hooks/useOperators'
+import { storageLocationsService, StorageLocation } from '@/services/storageLocationsService'
+import { tagmentPrintService } from '@/services/tagmentPrintService'
 
 type Step = 'categorias' | 'subcategorias' | 'produtos' | 'configuracao'
 
@@ -33,6 +36,9 @@ export default function ValidadeSelecaoPage() {
   const [dataValidade, setDataValidade] = useState('')
   const [selectedOperator, setSelectedOperator] = useState<Operator | null>(null)
   const [showOperatorModal, setShowOperatorModal] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState<StorageLocation | null>(null)
+  const [showLocationModal, setShowLocationModal] = useState(false)
+  const [storageLocations, setStorageLocations] = useState<StorageLocation[]>([])
 
   const unidades = ['KG', 'G', 'L', 'ML', 'UN']
 
@@ -66,6 +72,21 @@ export default function ValidadeSelecaoPage() {
     }
   }, [selectedOperator]);
 
+  // Carregar locais de armazenamento
+  useEffect(() => {
+    const loadStorageLocations = async () => {
+      if (clientId) {
+        try {
+          const locations = await storageLocationsService.getAll();
+          setStorageLocations(locations.filter(loc => loc.ativo));
+        } catch (error) {
+          console.error('Erro ao carregar locais:', error);
+        }
+      }
+    };
+    loadStorageLocations();
+  }, [clientId]);
+
   // Calcular subcategorias da categoria selecionada
   const subcategories = selectedCategory 
     ? categories.filter(cat => cat.parentId === selectedCategory.id)
@@ -92,34 +113,84 @@ export default function ValidadeSelecaoPage() {
       )
     : []
 
-  // Calcular data de validade automaticamente baseada na data de manipulação
+  // Verificar se a conservação selecionada ainda é válida quando o produto mudar
   useEffect(() => {
-    if (conservacao && dataManipulacao) {
-      const dataBase = new Date(dataManipulacao)
-      let diasValidade = 0
+    if (selectedProduct && conservacao) {
+      let isCurrentConservacaoValid = true
       
       switch (conservacao) {
         case 'ambiente':
-          diasValidade = 7
+          isCurrentConservacaoValid = (selectedProduct.shelfLifeAmbient || 0) > 0
           break
         case 'refrigerado':
-          diasValidade = 30
+          isCurrentConservacaoValid = (selectedProduct.shelfLifeRefrigerated || 0) > 0
           break
         case 'congelado':
-          diasValidade = 90
+          isCurrentConservacaoValid = (selectedProduct.shelfLifeFrozen || 0) > 0
+          break
+      }
+      
+      // Se a conservação atual não é mais válida, limpar seleção
+      if (!isCurrentConservacaoValid) {
+        setConservacao(null)
+        setDataValidade('')
+      }
+    }
+  }, [selectedProduct, conservacao])
+
+  // Calcular data de validade automaticamente baseada na data de manipulação e produto selecionado
+  useEffect(() => {
+    if (conservacao && dataManipulacao && selectedProduct) {
+      const dataBase = new Date(dataManipulacao)
+      let diasValidade = 0
+      
+      // Usar os dias de validade cadastrados no produto, ou valores padrão se não estiver definido
+      switch (conservacao) {
+        case 'ambiente':
+          diasValidade = selectedProduct.shelfLifeAmbient || 7
+          break
+        case 'refrigerado':
+          diasValidade = selectedProduct.shelfLifeRefrigerated || 30
+          break
+        case 'congelado':
+          diasValidade = selectedProduct.shelfLifeFrozen || 90
           break
       }
       
       const dataFutura = new Date(dataBase.getTime() + (diasValidade * 24 * 60 * 60 * 1000))
       setDataValidade(dataFutura.toISOString().split('T')[0])
     }
-  }, [conservacao, dataManipulacao])
+  }, [conservacao, dataManipulacao, selectedProduct])
 
   const getConservacaoInfo = (tipo: 'ambiente' | 'refrigerado' | 'congelado') => {
+    let dias = '0 dias'
+    
+    if (selectedProduct) {
+      switch (tipo) {
+        case 'ambiente':
+          dias = `${selectedProduct.shelfLifeAmbient || 7} dias`
+          break
+        case 'refrigerado':
+          dias = `${selectedProduct.shelfLifeRefrigerated || 30} dias`
+          break
+        case 'congelado':
+          dias = `${selectedProduct.shelfLifeFrozen || 90} dias`
+          break
+      }
+    } else {
+      // Valores padrão quando nenhum produto está selecionado
+      const defaultDays = {
+        ambiente: '7 dias',
+        refrigerado: '30 dias',
+        congelado: '90 dias'
+      }
+      dias = defaultDays[tipo]
+    }
+    
     const info = {
-      ambiente: { icon: House, label: 'Ambiente', color: 'text-green-500', dias: '7 dias' },
-      refrigerado: { icon: Thermometer, label: 'Refrigerado', color: 'text-blue-500', dias: '30 dias' },
-      congelado: { icon: Snowflake, label: 'Congelado', color: 'text-cyan-500', dias: '90 dias' }
+      ambiente: { icon: House, label: 'Ambiente', color: 'text-green-500', dias },
+      refrigerado: { icon: Thermometer, label: 'Refrigerado', color: 'text-blue-500', dias },
+      congelado: { icon: Snowflake, label: 'Congelado', color: 'text-cyan-500', dias }
     }
     return info[tipo]
   }
@@ -227,6 +298,7 @@ export default function ValidadeSelecaoPage() {
         validityDate: dataValidade,
         clientId: user.clientId,
         productId: selectedProduct.id,
+        storageLocationId: selectedLocation?.id,
         notes: undefined,
         metadata: {
           conservacao,
@@ -243,6 +315,7 @@ export default function ValidadeSelecaoPage() {
       setUnidade('KG')
       setDataManipulacao(new Date().toISOString().split('T')[0])
       setDataValidade('')
+      setSelectedLocation(null)
       setSelectedProduct(null)
       setCurrentStep('produtos')
     } catch (error) {
@@ -296,6 +369,7 @@ export default function ValidadeSelecaoPage() {
         validityDate: dataValidade,
         clientId: user.clientId,
         productId: selectedProduct.id,
+        storageLocationId: selectedLocation?.id,
         notes: undefined,
         metadata: {
           conservacao,
@@ -303,7 +377,34 @@ export default function ValidadeSelecaoPage() {
         }
       })
 
-      toast.success('Etiqueta criada! Redirecionando para impressão...')
+      toast.success('Etiqueta criada! Enviando para impressão...')
+      
+      // Imprimir via Tagment
+      try {
+        const printResult = await tagmentPrintService.printValidityLabel(user.clientId, {
+          productName: selectedProduct.name,
+          brand: selectedProduct.brand || 'GranoBox',
+          sif: '12345', // TODO: Obter SIF real do cliente
+          originalPackingDate: dataManipulacao,
+          manipulationDate: dataManipulacao,
+          validityDate: dataValidade,
+          weight: peso ? `${peso} ${unidade}` : undefined,
+          code: label.code,
+          storageLocation: selectedLocation?.nome
+        });
+
+        if (printResult.success) {
+          toast.success(`✅ Etiqueta ${label.code} enviada para impressão!`)
+          
+          // Marcar como impressa na API
+          await labelsService.markAsPrinted([label.id]);
+        } else {
+          toast.error(`❌ Erro na impressão: ${printResult.message}`)
+        }
+      } catch (printError) {
+        console.error('Erro na impressão Tagment:', printError);
+        toast.error('Erro ao enviar para impressão. Etiqueta criada mas não impressa.');
+      }
       
       // Reset form (mantém responsável selecionado)
       setConservacao(null)
@@ -312,11 +413,9 @@ export default function ValidadeSelecaoPage() {
       setUnidade('KG')
       setDataManipulacao(new Date().toISOString().split('T')[0])
       setDataValidade('')
+      setSelectedLocation(null)
       setSelectedProduct(null)
       setCurrentStep('produtos')
-
-      // Redirecionar para impressão com a etiqueta específica
-      navigate(`/etiquetas/validade/impressao?printNow=${label.id}`)
     } catch (error) {
       console.error('Erro ao criar etiqueta:', error);
       toast.error('Erro ao criar etiqueta para impressão');
@@ -387,14 +486,7 @@ export default function ValidadeSelecaoPage() {
   }
 
   if (categoriesLoading || productsLoading) {
-    return (
-      <div className={`min-h-screen ${theme === 'dark' ? 'bg-dark-900' : 'bg-light-50'} flex items-center justify-center`}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className={theme === 'dark' ? 'text-white' : 'text-dark-900'}>Carregando...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading text="Carregando dados..." />
   }
 
   return (
@@ -407,7 +499,7 @@ export default function ValidadeSelecaoPage() {
               onClick={handleBack}
               className={`p-2 ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'} rounded-lg transition-colors`}
             >
-              <ArrowLeft size={24} weight="duotone" />
+              <ArrowLeft size={24} className={theme === 'dark' ? 'text-white' : 'text-dark-900'} />
             </button>
             <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg">
               <Clock size={24} weight="duotone" className="text-white" />
@@ -652,38 +744,112 @@ export default function ValidadeSelecaoPage() {
                   const Icon = info.icon
                   const isSelected = conservacao === tipo
                   
+                  // Verificar se a opção deve estar desabilitada (0 dias)
+                  let isDisabled = false
+                  if (selectedProduct) {
+                    switch (tipo) {
+                      case 'ambiente':
+                        isDisabled = (selectedProduct.shelfLifeAmbient || 0) === 0
+                        break
+                      case 'refrigerado':
+                        isDisabled = (selectedProduct.shelfLifeRefrigerated || 0) === 0
+                        break
+                      case 'congelado':
+                        isDisabled = (selectedProduct.shelfLifeFrozen || 0) === 0
+                        break
+                    }
+                  }
+                  
                   return (
                     <button
                       key={tipo}
-                      onClick={() => setConservacao(tipo)}
+                      onClick={() => !isDisabled && setConservacao(tipo)}
+                      disabled={isDisabled}
                       className={`flex-1 py-3 rounded-xl border-2 transition-all ${
-                        isSelected
+                        isDisabled
+                          ? 'border-gray-200 bg-gray-100 cursor-not-allowed opacity-50'
+                          : isSelected
                           ? 'border-primary bg-primary/20'
                           : theme === 'dark'
-                          ? 'border-dark-600 bg-dark-700'
-                          : 'border-light-300 bg-light-50'
+                          ? 'border-dark-600 bg-dark-700 hover:border-dark-500'
+                          : 'border-light-300 bg-light-50 hover:border-light-400'
                       }`}
                     >
                       <div className="flex flex-col items-center space-y-2">
                         <Icon 
                           size={24} 
-                          className={isSelected ? 'text-primary' : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} 
+                          className={
+                            isDisabled
+                              ? 'text-gray-400'
+                              : isSelected 
+                              ? 'text-primary' 
+                              : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'
+                          } 
                         />
                         <span className={`text-xs font-semibold ${
-                          isSelected 
+                          isDisabled
+                            ? 'text-gray-400'
+                            : isSelected 
                             ? 'text-primary' 
                             : theme === 'dark' ? 'text-white' : 'text-dark-900'
                         }`}>
                           {info.label}
                         </span>
-                        <span className={`text-xs ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
-                          {info.dias}
+                        <span className={`text-xs ${
+                          isDisabled
+                            ? 'text-gray-400'
+                            : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'
+                        }`}>
+                          {isDisabled ? 'Indisponível' : info.dias}
                         </span>
                       </div>
                     </button>
                   )
                 })}
               </div>
+            </div>
+
+            {/* Local de Armazenamento */}
+            <div>
+              <button
+                onClick={() => setShowLocationModal(true)}
+                className={`w-full p-4 rounded-xl border-2 transition-all ${
+                  selectedLocation
+                    ? 'border-primary bg-primary/10'
+                    : theme === 'dark'
+                    ? 'border-dark-600 bg-dark-700'
+                    : 'border-light-300 bg-light-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <MapPin 
+                      size={20} 
+                      className={selectedLocation ? 'text-primary' : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} 
+                    />
+                    <div className="text-left">
+                      <div className={`font-semibold ${
+                        selectedLocation 
+                          ? 'text-primary' 
+                          : theme === 'dark' ? 'text-primary' : 'text-primary'
+                      }`}>
+                        Local de Armazenamento
+                      </div>
+                      <div className={`text-sm ${
+                        selectedLocation 
+                          ? theme === 'dark' ? 'text-white' : 'text-dark-900'
+                          : theme === 'dark' ? 'text-dark-400' : 'text-dark-600'
+                      }`}>
+                        {selectedLocation ? selectedLocation.nome : 'Nenhum local selecionado'}
+                      </div>
+                    </div>
+                  </div>
+                  <CaretDown 
+                    size={16} 
+                    className={selectedLocation ? 'text-primary' : theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} 
+                  />
+                </div>
+              </button>
             </div>
 
             {/* Peso/Quantidade e Quantidade de Etiquetas - Como no Flutter */}
@@ -853,6 +1019,127 @@ export default function ValidadeSelecaoPage() {
                       </div>
                       
                       {selectedOperator?.id === operator.id && (
+                        <div className="text-primary">✓</div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Seleção de Local */}
+      {showLocationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800' : 'bg-white'} rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto`}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                Selecionar Local
+              </h2>
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className={`p-2 rounded-lg transition-colors ${
+                  theme === 'dark' 
+                    ? 'hover:bg-dark-700 text-dark-300' 
+                    : 'hover:bg-light-100 text-dark-600'
+                }`}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Opção para não selecionar local */}
+            <div className="mb-4">
+              <button
+                onClick={() => {
+                  setSelectedLocation(null);
+                  setShowLocationModal(false);
+                  toast.success('Local removido');
+                }}
+                className={`w-full p-4 rounded-xl border transition-colors text-left ${
+                  !selectedLocation
+                    ? 'border-primary bg-primary/10'
+                    : theme === 'dark'
+                    ? 'border-dark-600 hover:border-dark-500'
+                    : 'border-light-300 hover:border-light-400'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    !selectedLocation ? 'bg-primary text-white' : 'bg-gray-100'
+                  }`}>
+                    <MapPin size={20} className={!selectedLocation ? 'text-white' : 'text-gray-600'} />
+                  </div>
+                  <div>
+                    <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                      Sem local específico
+                    </h3>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                      Não especificar local
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {storageLocations.length === 0 ? (
+              <div className="text-center py-8">
+                <MapPin size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-light-400'}`} />
+                <p className={`${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'} mb-4`}>
+                  Nenhum local cadastrado
+                </p>
+                <button
+                  onClick={() => {
+                    setShowLocationModal(false)
+                    navigate('/cadastro/locais')
+                  }}
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Cadastrar Locais
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {storageLocations.map((location) => (
+                  <button
+                    key={location.id}
+                    onClick={() => {
+                      setSelectedLocation(location);
+                      setShowLocationModal(false);
+                      toast.success(`Local selecionado: ${location.nome}`);
+                    }}
+                    className={`w-full p-4 rounded-xl border transition-colors text-left ${
+                      selectedLocation?.id === location.id
+                        ? 'border-primary bg-primary/10'
+                        : theme === 'dark'
+                        ? 'border-dark-600 hover:border-dark-500'
+                        : 'border-light-300 hover:border-light-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedLocation?.id === location.id ? 'bg-primary text-white' : storageLocationsService.getTemperaturaColor(location.tipo)
+                        }`}>
+                          <MapPin size={20} className={selectedLocation?.id === location.id ? 'text-white' : 'text-white'} />
+                        </div>
+                        <div>
+                          <h3 className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                            {location.nome}
+                          </h3>
+                          <div className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                            <span className="capitalize">{location.tipo}</span>
+                            {location.setor && ` • ${location.setor}`}
+                            {location.temperatura !== undefined && location.temperatura !== null && (
+                              <span> • {location.temperatura % 1 === 0 ? Math.floor(location.temperatura) : location.temperatura} °C</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {selectedLocation?.id === location.id && (
                         <div className="text-primary">✓</div>
                       )}
                     </div>

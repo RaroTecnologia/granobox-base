@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { PageLoading, SectionLoading, InlineLoading } from '@/components/LoadingSpinner'
 import { useCategories } from '@/hooks/useCategories'
 import { useProducts } from '@/hooks/useProducts'
 import { 
@@ -272,12 +273,7 @@ export default function CadastroItemPage() {
   // Mostrar loading enquanto carrega autenticação
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Spinner size={48} className="animate-spin text-primary mb-4" />
-          <p className="text-lg">Carregando...</p>
-        </div>
-      </div>
+      <PageLoading text="Carregando..." />
     )
   }
 
@@ -356,7 +352,7 @@ export default function CadastroItemPage() {
                 className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
               >
                 {isSubmitting ? (
-                  <Spinner size={20} className="animate-spin" />
+                  <InlineLoading size="sm" />
                 ) : (
                   <Check size={20} />
                 )}
@@ -370,10 +366,7 @@ export default function CadastroItemPage() {
       {/* Content */}
       <main className="px-6 py-6">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner size={32} className="animate-spin text-primary" />
-            <span className="ml-3 text-lg">Carregando...</span>
-          </div>
+          <SectionLoading text="Carregando dados..." size="lg" />
         ) : (
           <form id="product-form" onSubmit={handleSubmit} className="max-w-4xl mx-auto">
             <div className="grid gap-6">

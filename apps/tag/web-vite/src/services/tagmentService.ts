@@ -184,7 +184,34 @@ class TagmentService {
 
   // Gerenciamento de impressoras
   async getPrintersByCustomer(customerId: string): Promise<TagmentPrinter[]> {
-    return await this.request(`/v1/printers/customer/${customerId}`);
+    console.log('🔍 TagmentService.getPrintersByCustomer: Buscando para customerId:', customerId);
+    console.log('🔍 Token configurado:', this.token ? `${this.token.substring(0, 10)}...` : 'NENHUM');
+    console.log('🔍 URL da API:', `${this.baseURL}/v1/printers/customer/${customerId}`);
+    
+    try {
+      const result = await this.request(`/v1/printers/customer/${customerId}`);
+      console.log('🔍 Resposta da API Tagment (por customer):', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro na busca de impressoras por customer:', error);
+      throw error;
+    }
+  }
+
+  // Buscar todas as impressoras (mesmo endpoint do control)
+  async getAllPrinters(): Promise<TagmentPrinter[]> {
+    console.log('🔍 TagmentService.getAllPrinters: Iniciando busca...');
+    console.log('🔍 Token configurado:', this.token ? `${this.token.substring(0, 10)}...` : 'NENHUM');
+    console.log('🔍 URL da API:', `${this.baseURL}/v1/printers`);
+    
+    try {
+      const result = await this.request('/v1/printers');
+      console.log('🔍 Resposta da API Tagment:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro na busca de impressoras Tagment:', error);
+      throw error;
+    }
   }
 
   async registerPrinter(printerData: any, agentFingerprint: string) {

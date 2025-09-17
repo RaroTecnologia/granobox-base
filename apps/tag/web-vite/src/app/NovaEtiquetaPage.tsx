@@ -61,7 +61,7 @@ export default function NovaEtiquetaPage() {
               onClick={() => navigate('/etiquetas')}
               className={`p-2 transition-colors ${theme === 'dark' ? 'text-dark-400 hover:text-white' : 'text-dark-600 hover:text-dark-900'}`}
             >
-              <ArrowLeft size={24} weight="duotone" />
+              <ArrowLeft size={24} className={theme === 'dark' ? 'text-white' : 'text-dark-900'} />
             </button>
             <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center">
               <Printer size={24} weight="duotone" className="text-primary" />

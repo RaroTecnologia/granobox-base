@@ -9,7 +9,7 @@ import DashboardPage from '@/app/DashboardPage'
 import EtiquetasPage from '@/app/EtiquetasPage'
 import CadastrosPage from '@/app/CadastrosPage'
 import ConfiguracoesPage from '@/app/ConfiguracoesPage'
-import ConfiguracoesImpressorasPage from '@/app/ConfiguracoesImpressorasPage'
+import ConfiguracoesImpressorasPage from '@/app/ConfiguracoesImpressorasPageSimple'
 import ConfigurarImpressoraPage from '@/app/ConfigurarImpressoraPage'
 import AdicionarImpressoraPage from '@/app/AdicionarImpressoraPage'
 import NovaEtiquetaPage from '@/app/NovaEtiquetaPage'
@@ -27,6 +27,7 @@ import RotuloImpressaoPage from '@/app/RotuloImpressaoPage'
 import PerfilPage from '@/app/PerfilPage'
 import RelatoriosPage from '@/app/RelatoriosPage'
 import RecebimentoPage from '@/app/RecebimentoPage'
+import CadastroLocaisPage from '@/app/CadastroLocaisPage'
 
 const router = createBrowserRouter([
   {
@@ -158,6 +159,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CadastroOperadoresPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/cadastro/locais",
+    element: (
+      <ProtectedRoute>
+        <CadastroLocaisPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/cadastro/locais/:id",
+    element: (
+      <ProtectedRoute>
+        <CadastroLocaisPage />
       </ProtectedRoute>
     ),
   },

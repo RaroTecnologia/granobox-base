@@ -1,5 +1,6 @@
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { SectionLoading, InlineLoading } from '@/components/LoadingSpinner'
 import { useOperations } from '@/hooks/useOperations'
 import { useLimits } from '@/hooks/useLimits'
 import { useDashboard } from '@/hooks/useDashboard'
@@ -308,7 +309,7 @@ export default function DashboardPage() {
               <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Ativas</span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-              {dashboardLoading ? '...' : stats.totalLabels}
+              {dashboardLoading ? <InlineLoading size="md" /> : stats.totalLabels}
             </div>
             <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Etiquetas</div>
           </div>
@@ -321,7 +322,7 @@ export default function DashboardPage() {
               <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Hoje</span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-              {dashboardLoading ? '...' : stats.labelsToday}
+              {dashboardLoading ? <InlineLoading size="md" /> : stats.labelsToday}
             </div>
             <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Criadas</div>
           </div>
@@ -342,7 +343,7 @@ export default function DashboardPage() {
               <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Vencendo</span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-              {dashboardLoading ? '...' : stats.expiring15Days}
+              {dashboardLoading ? <InlineLoading size="md" /> : stats.expiring15Days}
             </div>
             <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Em 15 dias</div>
           </div>
@@ -363,7 +364,7 @@ export default function DashboardPage() {
               <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Vencidas</span>
             </div>
             <div className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-              {dashboardLoading ? '...' : stats.expired}
+              {dashboardLoading ? <InlineLoading size="md" /> : stats.expired}
             </div>
             <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Atenção!</div>
           </div>
@@ -406,11 +407,7 @@ export default function DashboardPage() {
           
           <div className="space-y-3">
             {dashboardLoading ? (
-              <div className="text-center py-8">
-                <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                  Carregando etiquetas...
-                </div>
-              </div>
+              <SectionLoading text="Carregando etiquetas..." />
             ) : recentEtiquetas.length === 0 ? (
               <div className="text-center py-8">
                 <Tag size={48} className={`mx-auto mb-2 ${theme === 'dark' ? 'text-dark-600' : 'text-gray-400'}`} />
@@ -469,13 +466,13 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
               <div className={`text-2xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                {dashboardLoading ? '...' : stats.labelsThisWeek}
+                {dashboardLoading ? <InlineLoading size="md" /> : stats.labelsThisWeek}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Esta Semana</div>
             </div>
             <div className="text-center">
               <div className={`text-2xl font-bold mb-1 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                {dashboardLoading ? '...' : stats.labelsThisMonth}
+                {dashboardLoading ? <InlineLoading size="md" /> : stats.labelsThisMonth}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>Este Mês</div>
             </div>

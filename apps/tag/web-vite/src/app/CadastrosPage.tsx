@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { useCategories } from '@/hooks/useCategories'
 import { useProducts } from '@/hooks/useProducts'
 import { labelsService } from '@/services/labelsService'
-import { SectionLoading } from '@/components/LoadingSpinner'
+import { SectionLoading, PageLoading } from '@/components/LoadingSpinner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { toast } from 'react-hot-toast'
 import { 
@@ -19,7 +19,8 @@ import {
   CaretRight,
   CaretDown,
   TrayArrowDown,
-  Spinner
+  Spinner,
+  MapPin
 } from '@phosphor-icons/react'
 import FooterNavigation from '@/components/FooterNavigation'
 import type { Category } from '@/services/categoriesService'
@@ -423,14 +424,7 @@ export default function CadastrosPage() {
 
   // Mostrar loading enquanto carrega autenticação
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Spinner size={48} className="animate-spin text-primary mb-4" />
-          <p className="text-lg">Carregando...</p>
-        </div>
-      </div>
-    )
+    return <PageLoading text="Carregando..." />
   }
 
   // Verificar se usuário está logado
@@ -485,6 +479,14 @@ export default function CadastrosPage() {
               >
                 <Plus size={20} />
                 <span>Produto</span>
+              </button>
+
+              <button
+                onClick={() => navigate('/cadastro/locais')}
+                className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <Plus size={20} />
+                <span>Armazenamento</span>
               </button>
             </div>
           </div>
@@ -554,10 +556,7 @@ export default function CadastrosPage() {
         )}
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner size={32} className="animate-spin text-primary" />
-            <span className="ml-3 text-lg">Carregando...</span>
-          </div>
+          <SectionLoading text="Carregando dados..." size="lg" />
         ) : (
           <>
             {activeTab === 'categorias' && (

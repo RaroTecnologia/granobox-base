@@ -1,6 +1,8 @@
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { EtiquetaPreview } from '@/components/EtiquetaPreview'
+import { SectionLoading } from '@/components/LoadingSpinner'
+import { tagmentPrintService } from '@/services/tagmentPrintService'
 import { 
   Plus, 
   MagnifyingGlass, 
@@ -37,9 +39,11 @@ export default function EtiquetasPage() {
   const [sortBy, setSortBy] = useState('recentes')
   const [showFiltersModal, setShowFiltersModal] = useState(false)
   const [showQrModal, setShowQrModal] = useState(false)
+  const [showPrintModal, setShowPrintModal] = useState(false)
   const [selectedLabel, setSelectedLabel] = useState<Label | null>(null)
   const [etiquetas, setEtiquetas] = useState<Label[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [showTagmentConfig, setShowTagmentConfig] = useState(false)
   const [advancedFilters, setAdvancedFilters] = useState({
     segmento: [] as string[],
     categoria: '',
@@ -92,6 +96,51 @@ export default function EtiquetasPage() {
     } catch (error) {
       console.error('Erro ao dar baixa:', error);
       toast.error('Erro ao dar baixa na etiqueta');
+    }
+  };
+
+  // Função para confirmar e imprimir etiqueta
+  const handleConfirmPrint = async () => {
+    if (!selectedLabel || !user?.clientId) return;
+    
+    try {
+      toast.loading('Enviando para impressão...');
+      
+      // Imprimir via Tagment
+      const printResult = await tagmentPrintService.printValidityLabel(user.clientId, {
+        productName: selectedLabel.product?.name || 'Produto',
+        brand: 'GranoBox', // TODO: Obter marca real
+        sif: '12345', // TODO: Obter SIF real do cliente
+        originalPackingDate: selectedLabel.productionDate,
+        manipulationDate: selectedLabel.productionDate,
+        validityDate: selectedLabel.validityDate,
+        weight: selectedLabel.weight ? `${selectedLabel.weight} ${selectedLabel.unit || ''}` : undefined,
+        code: selectedLabel.code,
+        storageLocation: undefined // TODO: Obter local se disponível
+      });
+
+      if (printResult.success) {
+        toast.success(`✅ Etiqueta ${selectedLabel.code} enviada para impressão!`);
+        
+        // Marcar como impressa na API
+        await labelsService.markAsPrinted([selectedLabel.id]);
+        
+        // Atualizar lista local
+        setEtiquetas(prev => prev.map(etiqueta => 
+          etiqueta.id === selectedLabel.id 
+            ? { ...etiqueta, status: 'printed' as const }
+            : etiqueta
+        ));
+      } else {
+        toast.error(`❌ Erro na impressão: ${printResult.message}`);
+      }
+      
+      // Fechar modal
+      setShowPrintModal(false);
+      setSelectedLabel(null);
+    } catch (error) {
+      console.error('Erro ao imprimir etiqueta:', error);
+      toast.error('Erro ao enviar etiqueta para impressão');
     }
   };
 
@@ -379,12 +428,8 @@ export default function EtiquetasPage() {
         {/* Lista de Etiquetas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 justify-items-center">
           {isLoading ? (
-            // Loading state
-            <div className="col-span-full text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className={`text-lg ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                Carregando etiquetas...
-              </p>
+            <div className="col-span-full">
+              <SectionLoading text="Carregando etiquetas..." size="lg" />
             </div>
           ) : sortedEtiquetas.length > 0 ? (
             sortedEtiquetas.map((etiqueta) => {
@@ -403,6 +448,19 @@ export default function EtiquetasPage() {
                         <span>{getStatusText(etiqueta)}</span>
                       </div>
                     </div>
+                    
+                    {etiqueta.status === 'pending' && (
+                      <button
+                        onClick={() => {
+                          setSelectedLabel(etiqueta);
+                          setShowPrintModal(true);
+                        }}
+                        className="p-2 text-white bg-primary hover:bg-primary/90 rounded-full transition-colors"
+                        title="Imprimir etiqueta"
+                      >
+                        <Printer size={16} weight="duotone" />
+                      </button>
+                    )}
                     
                     {(etiqueta.status === 'printed' || isLabelUsed(etiqueta)) && (
                       <button
@@ -822,6 +880,86 @@ export default function EtiquetasPage() {
               >
                 Aplicar Filtros
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Impressão */}
+      {showPrintModal && selectedLabel && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} rounded-2xl p-6 border shadow-2xl max-w-md w-full`}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                Confirmar Impressão
+              </h3>
+              <button 
+                onClick={() => {
+                  setShowPrintModal(false);
+                  setSelectedLabel(null);
+                }}
+                className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-dark-700' : 'hover:bg-light-100'}`}
+              >
+                <X size={20} weight="duotone" className={theme === 'dark' ? 'text-dark-400' : 'text-dark-600'} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Informações da Etiqueta */}
+              <div className={`p-4 rounded-xl ${theme === 'dark' ? 'bg-dark-700' : 'bg-gray-50'}`}>
+                <h4 className={`font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                  {selectedLabel.product.name}
+                </h4>
+                <div className="space-y-1 text-sm">
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>Código:</strong> {selectedLabel.code}
+                  </p>
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>Quantidade:</strong> {selectedLabel.quantity} {selectedLabel.unit || 'UN'}
+                  </p>
+                  <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                    <strong>Validade:</strong> {formatarData(selectedLabel.validityDate)}
+                  </p>
+                  {selectedLabel.productionDate && (
+                    <p className={theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}>
+                      <strong>Produção:</strong> {formatarData(selectedLabel.productionDate)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Ícone de impressora */}
+              <div className="text-center py-4">
+                <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Printer size={32} weight="duotone" className="text-primary" />
+                </div>
+                <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-gray-600'}`}>
+                  Deseja imprimir esta etiqueta agora?
+                </p>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowPrintModal(false);
+                    setSelectedLabel(null);
+                  }}
+                  className={`flex-1 px-4 py-3 rounded-xl border-2 transition-colors ${
+                    theme === 'dark' 
+                      ? 'border-dark-600 text-white hover:bg-dark-700' 
+                      : 'border-light-300 text-dark-900 hover:bg-light-100'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmPrint}
+                  className="flex-1 px-4 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-medium"
+                >
+                  Imprimir
+                </button>
+              </div>
             </div>
           </div>
         </div>

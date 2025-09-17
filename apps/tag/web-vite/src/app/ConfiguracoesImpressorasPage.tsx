@@ -4,6 +4,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTagment } from '@/hooks/useTagment'
 import { printersService, GranoboxPrinter } from '@/services/printersService'
+import { TagmentPrinter } from '@/services/tagmentService'
 import { 
   ArrowLeft, 
   Printer, 
@@ -26,35 +27,148 @@ export default function ConfiguracoesImpressorasPage() {
   const { theme } = useTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const tagmentHook = useTagment()
   const { 
     isConnected: isTagmentConnected, 
     printers: tagmentPrinters, 
     loadPrinters,
-    sendPrintJob,
-    // Estados WebSocket
-    isWebSocketConnected,
-    connectedAgents,
-    agentsInfo,
-    jobStatus,
-    // Ações WebSocket
-    loadConnectedAgents,
-    sendTestJobWebSocket,
-    sendCustomJobWebSocket
-  } = useTagment()
+    reloadPrinters
+  } = tagmentHook
+
+  // Debug completo do hook
+  useEffect(() => {
+    console.log('🔍 DEBUG COMPLETO DO HOOK useTagment:');
+    console.log('  - tagmentHook completo:', tagmentHook);
+    console.log('  - isTagmentConnected:', isTagmentConnected);
+    console.log('  - tagmentPrinters:', tagmentPrinters);
+    console.log('  - tagmentPrinters.length:', tagmentPrinters?.length);
+    console.log('  - typeof tagmentPrinters:', typeof tagmentPrinters);
+    console.log('  - Array.isArray(tagmentPrinters):', Array.isArray(tagmentPrinters));
+    
+    // Forçar re-render se necessário
+    if (tagmentPrinters && tagmentPrinters.length > 0) {
+      console.log('🔄 FORÇANDO RE-RENDER - Impressoras encontradas!');
+    }
+  }, [tagmentHook, isTagmentConnected, tagmentPrinters]);
   
   // Debug: log das impressoras do Tagment
   useEffect(() => {
-    console.log('ConfiguracoesImpressorasPage - tagmentPrinters:', tagmentPrinters);
+    console.log('🖼️ ConfiguracoesImpressorasPage - tagmentPrinters:', tagmentPrinters);
+    console.log('🖼️ Quantidade de impressoras:', tagmentPrinters.length);
+    console.log('🖼️ isTagmentConnected:', isTagmentConnected);
+    tagmentPrinters.forEach((printer, index) => {
+      console.log(`🖼️ Impressora ${index + 1}:`, {
+        id: printer.id,
+        name: printer.name,
+        displayName: printer.displayName,
+        status: printer.status
+      });
+    });
   }, [tagmentPrinters]);
+  
+  // Função de debug para testar API
+  const debugApi = async () => {
+    if (!user?.clientId) {
+      console.log('🐛 DEBUG: Usuário ou clientId não encontrado');
+      return;
+    }
+    
+    try {
+      console.log('🐛 DEBUG: === INICIANDO TESTES COMPLETOS DA API ===');
+      
+      // Teste 1: Buscar dados do cliente
+      console.log('🐛 DEBUG: 1. Testando endpoint /clients/' + user.clientId);
+      const response = await fetch(`http://localhost:3001/clients/${user.clientId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('🐛 DEBUG: Status da resposta:', response.status);
+      
+      if (!response.ok) {
+        console.log('🐛 DEBUG: Erro na resposta:', await response.text());
+        return;
+      }
 
-  // Carregar impressoras do Granobox na inicialização
-  useEffect(() => {
-    loadGranoboxPrinters();
-  }, [user?.clientId]);
+      const client = await response.json();
+      console.log('🐛 DEBUG: Dados do cliente:', client);
+      
+      const apiKey = client.tagmentApiKey;
+      console.log('🐛 DEBUG: 2. API Key encontrada:', !!apiKey, apiKey ? `(${apiKey.substring(0, 10)}...)` : '');
+      
+      if (!apiKey) {
+        console.log('🐛 DEBUG: ❌ Sem API Key - não é possível testar Tagment');
+        return;
+      }
+
+      // Teste 2: Auth info
+      console.log('🐛 DEBUG: 3. Testando autenticação Tagment...');
+      const authResponse = await fetch('https://api.tagment.com.br/v1/auth/info', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const authData = await authResponse.json();
+      console.log('🐛 DEBUG: Auth info:', authData);
+
+      // Teste 3: Endpoint /v1/printers
+      console.log('🐛 DEBUG: 4. Testando /v1/printers...');
+      const printersResponse = await fetch('https://api.tagment.com.br/v1/printers', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      });
+      const printersData = await printersResponse.json();
+      console.log('🐛 DEBUG: Resposta /v1/printers:', printersData);
+
+      // Teste 4: Se há customerId, testar endpoint específico
+      if (client.tagmentCustomerId) {
+        console.log('🐛 DEBUG: 5. Testando por customerId:', client.tagmentCustomerId);
+        const customerResponse = await fetch(`https://api.tagment.com.br/v1/printers/customer/${client.tagmentCustomerId}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        const customerData = await customerResponse.json();
+        console.log('🐛 DEBUG: Resposta por customer:', customerData);
+      } else {
+        console.log('🐛 DEBUG: 5. ⚠️ Cliente não tem tagmentCustomerId configurado');
+      }
+
+      // Teste 5: Forçar reload das impressoras
+      console.log('🐛 DEBUG: 6. Forçando reload das impressoras...');
+      await reloadPrinters();
+
+      console.log('🐛 DEBUG: === TESTES CONCLUÍDOS ===');
+      
+    } catch (error) {
+      console.error('🐛 DEBUG: Erro na requisição:', error);
+    }
+  };
+
+  // REMOVIDO: Não vamos mais carregar impressoras locais
+  // Agora usamos apenas impressoras do Tagment como fonte única
+  // useEffect(() => {
+  //   console.log('🔄 useEffect 1: Carregando impressoras locais do Granobox...');
+  //   loadGranoboxPrinters();
+  // }, [user?.clientId]);
   
   const [granoboxPrinters, setGranoboxPrinters] = useState<GranoboxPrinter[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showTagmentIntegration, setShowTagmentIntegration] = useState(false)
+  const [displayPrinters, setDisplayPrinters] = useState<TagmentPrinter[]>([])
+
+  // Sincronizar displayPrinters com tagmentPrinters
+  useEffect(() => {
+    console.log('🔄 SINCRONIZANDO displayPrinters com tagmentPrinters');
+    console.log('  - tagmentPrinters:', tagmentPrinters);
+    console.log('  - tagmentPrinters.length:', tagmentPrinters.length);
+    console.log('  - Array.isArray(tagmentPrinters):', Array.isArray(tagmentPrinters));
+    
+    if (tagmentPrinters && tagmentPrinters.length > 0) {
+      console.log('  - ✅ Atualizando displayPrinters com', tagmentPrinters.length, 'impressoras');
+      setDisplayPrinters([...tagmentPrinters]);
+    } else {
+      console.log('  - ⚠️ tagmentPrinters vazio, mantendo displayPrinters atual');
+      setDisplayPrinters([]);
+    }
+  }, [tagmentPrinters]);
   const [editingPrinter, setEditingPrinter] = useState<GranoboxPrinter | null>(null)
   const [showForm, setShowForm] = useState(false)
 
@@ -72,12 +186,31 @@ export default function ConfiguracoesImpressorasPage() {
 
     try {
       setIsLoading(true)
-      console.log('Carregando impressoras do Granobox para cliente:', user.clientId);
+      console.log('🏪 Carregando impressoras locais do Granobox para cliente:', user.clientId);
       const response = await printersService.getPrinters(user.clientId)
-      console.log('Impressoras carregadas do Granobox:', response);
+      console.log('🏪 Impressoras locais carregadas do Granobox:', response.length, 'impressoras:', response);
       setGranoboxPrinters(response)
+      
+      // Log detalhado de cada impressora
+      response.forEach((printer, index) => {
+        console.log(`🏪 Impressora local ${index + 1}:`, {
+          id: printer.id,
+          tagmentId: printer.tagmentId,
+          location: printer.location,
+          isActive: printer.isActive,
+          usage: printer.usage,
+          createdAt: printer.createdAt,
+          updatedAt: printer.updatedAt
+        });
+      });
+      
+      // Resumo final
+      console.log('📊 RESUMO FINAL:');
+      console.log(`   • Impressoras locais (Granobox): ${response.length}`);
+      console.log(`   • Impressoras Tagment: ${tagmentPrinters.length}`);
+      console.log(`   • Interface vai mostrar: ${response.length} impressora(s) local(is)`);
     } catch (error) {
-      console.error('Erro ao carregar impressoras:', error)
+      console.error('❌ Erro ao carregar impressoras locais:', error)
       toast.error('Erro ao carregar impressoras')
     } finally {
       setIsLoading(false)
@@ -245,11 +378,88 @@ export default function ConfiguracoesImpressorasPage() {
     }
   }
 
+  // Teste de impressão direta no Tagment (Nova Arquitetura)
+  const testPrintTagment = async (printer: TagmentPrinter) => {
+    try {
+      setIsLoading(true)
+      
+      console.log('🖨️ NOVA ARQUITETURA: Teste de impressão Tagment direto...')
+      console.log('🎯 Impressora:', printer.displayName || printer.id)
+      
+      // Verificar se há agentes conectados
+      if (connectedAgents.length === 0) {
+        toast.error('Nenhum Print Agent conectado. Conecte o Tagment Agent primeiro.');
+        return;
+      }
 
-  // Inicializar
-  useEffect(() => {
-    loadGranoboxPrinters()
-  }, [user?.clientId])
+      // Verificar se a impressora está online
+      if (printer.status !== 'online') {
+        toast.error(`Impressora ${printer.displayName} está ${printer.status}. Verifique a conexão.`);
+        return;
+      }
+      
+      // Dados de teste
+      const testData = {
+        NOME_DO_PRODUTO: 'TESTE DE IMPRESSÃO - GRANOBOX',
+        MARCA_VALOR: 'Sistema Granobox (Nova Arquitetura)',
+        QR_CODE: `https://granobox.com.br/teste/${Date.now()}`
+      };
+
+      console.log('📄 Dados do teste:', testData);
+      
+      // Template ID real do Tagment
+      const testTemplateId = '1c12926f-849b-4bd7-8a61-05036f39f443';
+      
+      // Gerar ZPL via API
+      console.log('📄 Gerando ZPL via API...');
+      const zplResult = await sendPrintJob(testTemplateId, testData, undefined, 'high');
+      
+      if (!zplResult || !zplResult.zpl) {
+        toast.error('❌ Falha ao gerar ZPL para teste');
+        return;
+      }
+
+      console.log('✅ ZPL gerado com sucesso');
+      
+      // Usar o nome da impressora para o WebSocket
+      const printerIdentifier = printer.displayName || printer.externalPrinterRef || 'default';
+      
+      // Enviar via WebSocket para o primeiro agente conectado
+      const agentFingerprint = connectedAgents[0];
+      console.log('📡 Enviando via WebSocket para:', printerIdentifier);
+      
+      const wsResult = await sendCustomJobWebSocket(agentFingerprint, {
+        printerId: printerIdentifier,
+        zplData: zplResult.zpl,
+        priority: 'high',
+        metadata: {
+          testJob: true,
+          printerName: printer.displayName,
+          clientId: user?.clientId,
+          architecture: 'tagment_only'
+        }
+      });
+      
+      if (wsResult.success) {
+        toast.success(`✅ Teste enviado para ${printer.displayName}!`);
+        console.log('✅ Job de teste enviado via WebSocket:', wsResult.jobId);
+      } else {
+        toast.error('❌ Falha ao enviar teste via WebSocket: ' + wsResult.message);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Erro no teste de impressão:', error)
+      toast.error(`Erro no teste: ${error.message || 'Erro desconhecido'}`)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Inicializar (REMOVIDO - DUPLICADO)
+  // useEffect(() => {
+  //   console.log('🔄 useEffect 2 (DUPLICADO): Carregando impressoras locais do Granobox...');
+  //   loadGranoboxPrinters()
+  // }, [user?.clientId])
 
   // Carregar impressoras do Tagment quando conectar
   useEffect(() => {
@@ -289,27 +499,62 @@ export default function ConfiguracoesImpressorasPage() {
               <h1 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
                 Impressoras Tagment
               </h1>
-              <p className="text-primary text-sm">Sincronize e configure impressoras via Tagment Agent</p>
+              <p className="text-primary text-sm">Gerenciamento direto via Tagment - Fonte única de dados</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-2">
             {isTagmentConnected ? (
-              <button
-                onClick={syncWithTagment}
-                disabled={isLoading}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
-              >
-                <ArrowClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
-                <span>Sincronizar Impressoras</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={reloadPrinters}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                >
+                  <ArrowClockwise size={16} className={isLoading ? 'animate-spin' : ''} />
+                  <span>Atualizar Lista</span>
+                </button>
+                    <button
+                      onClick={debugApi}
+                      className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                    >
+                      Debug API
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('🧹 Limpando cache e forçando reload...');
+                        localStorage.removeItem('tagment_api_key');
+                        window.location.reload();
+                      }}
+                      className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    >
+                      Limpar Cache
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('🔧 TESTE FORÇADO - Dados atuais:');
+                        console.log('  - tagmentPrinters:', tagmentPrinters);
+                        console.log('  - displayPrinters:', displayPrinters);
+                        console.log('  - isTagmentConnected:', isTagmentConnected);
+                        
+                        // Forçar atualização
+                        if (tagmentPrinters.length > 0) {
+                          console.log('🔧 Forçando atualização de displayPrinters...');
+                          setDisplayPrinters([...tagmentPrinters]);
+                        }
+                      }}
+                      className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm"
+                    >
+                      Teste Render
+                    </button>
+              </div>
             ) : (
               <button
                 onClick={() => setShowTagmentIntegration(true)}
                 className="px-4 py-2 bg-primary text-white hover:bg-primary-dark rounded-lg transition-colors flex items-center space-x-2"
               >
                 <Key size={16} />
-                <span>Configurar API Key Tagment</span>
+                <span>Conectar ao Tagment</span>
               </button>
             )}
           </div>
@@ -479,112 +724,260 @@ export default function ConfiguracoesImpressorasPage() {
             </div>
           )}
 
+          {/* Explicação da nova arquitetura */}
+          <div className={`mx-6 mb-4 p-4 rounded-lg border ${
+            theme === 'dark' ? 'bg-green-900/20 border-green-700/50' : 'bg-green-50 border-green-200'
+          }`}>
+            <div className="flex items-start space-x-3">
+              <div className="text-green-500 mt-1">✨</div>
+              <div>
+                <p className={`text-sm ${theme === 'dark' ? 'text-green-200' : 'text-green-700'}`}>
+                  <strong>Nova Arquitetura - Tagment como Fonte Única:</strong>
+                </p>
+                <ul className={`text-xs mt-1 space-y-1 ${theme === 'dark' ? 'text-green-300' : 'text-green-600'}`}>
+                  <li>• <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800 mr-1">Online</span> Impressora conectada e pronta para uso</li>
+                  <li>• <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-800 mr-1">Offline</span> Impressora desconectada ou com problemas</li>
+                  <li>• Dados sempre sincronizados com o sistema Tagment</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
           {/* Lista de Impressoras */}
           <div className={`p-6 rounded-xl border-2 ${
             theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'
           }`}>
             <div className="flex items-center justify-between mb-6">
               <h2 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                Impressoras Configuradas
+                Impressoras Tagment
               </h2>
               <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                {granoboxPrinters.length} impressora(s)
+                {displayPrinters.length} impressora(s)
               </span>
             </div>
 
-            {granoboxPrinters.length === 0 ? (
+            {displayPrinters.length === 0 ? (
               <div className={`p-8 text-center rounded-lg ${
                 theme === 'dark' ? 'bg-dark-700' : 'bg-light-50'
               }`}>
-                <Key size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-600' : 'text-dark-400'}`} />
+                <Printer size={48} className={`mx-auto mb-4 ${theme === 'dark' ? 'text-dark-600' : 'text-dark-400'}`} />
                 <p className={`text-lg font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                  Nenhuma impressora sincronizada
+                  Nenhuma impressora encontrada no Tagment
                 </p>
-                <p className={`text-sm mt-2 ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                  Configure sua API Key Tagment e sincronize suas impressoras
+                <p className={`text-sm mt-2 mb-4 ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                  {isTagmentConnected ? 
+                    'A API do Tagment não retornou impressoras. Verifique se há impressoras cadastradas na sua conta.' :
+                    'Conecte-se ao Tagment para visualizar suas impressoras'
+                  }
                 </p>
-                {!isTagmentConnected && (
+                {isTagmentConnected ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <button
+                      onClick={reloadPrinters}
+                      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
+                    >
+                      <ArrowClockwise size={16} />
+                      <span>Recarregar</span>
+                    </button>
+                    <button
+                      onClick={debugApi}
+                      className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600 transition-colors"
+                    >
+                      Debug API
+                    </button>
+                  </div>
+                ) : (
                   <button
                     onClick={() => setShowTagmentIntegration(true)}
-                    className="mt-4 px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2 mx-auto"
+                    className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors flex items-center space-x-2 mx-auto"
                   >
                     <Key size={16} />
-                    <span>Configurar API Key</span>
+                    <span>Conectar ao Tagment</span>
                   </button>
                 )}
               </div>
             ) : (
               <div className="space-y-3">
-                {granoboxPrinters.map((printer) => (
+                {displayPrinters.map((printer, index) => {
+                  console.log(`🖼️ RENDERIZAÇÃO: Renderizando impressora ${index + 1}:`, printer.name || printer.displayName);
+                  const isOnline = printer.status === 'online';
+                  
+                  return (
+                    <div
+                      key={printer.id}
+                      className={`p-4 rounded-lg border ${
+                        theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {isOnline ? (
+                            <CheckCircle size={24} className="text-green-500" />
+                          ) : (
+                            <XCircle size={24} className="text-red-500" />
+                          )}
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <h3 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                                {printer.displayName || `Impressora ${printer.id.slice(0, 8)}`}
+                              </h3>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs ${
+                                isOnline 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {isOnline ? 'Online' : 'Offline'}
+                              </span>
+                            </div>
+                            <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                              {printer.connection ? 
+                                `${printer.connection.host}:${printer.connection.port}` : 
+                                `ID: ${printer.id.slice(0, 8)}`
+                              }
+                            </p>
+                            <p className={`text-xs ${theme === 'dark' ? 'text-dark-500' : 'text-dark-500'}`}>
+                              Impressões hoje: {printer.printsToday || 0} • Total: {printer.totalPrints || 0}
+                            </p>
+                          </div>
+                        </div>
+                      
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => testPrintTagment(printer)}
+                            disabled={isLoading}
+                            className={`p-2 rounded-lg transition-colors ${
+                              theme === 'dark' ? 'text-green-400 hover:bg-green-900/20' : 'text-green-600 hover:bg-green-50'
+                            } disabled:opacity-50`}
+                            title="Teste de impressão"
+                          >
+                            <Play size={16} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: Implementar configurações específicas da impressora Tagment
+                              toast.info('Configurações da impressora são gerenciadas pelo Tagment')
+                            }}
+                            className={`p-2 rounded-lg transition-colors ${
+                              theme === 'dark' ? 'text-dark-400 hover:bg-dark-600' : 'text-dark-600 hover:bg-light-100'
+                            }`}
+                            title="Ver detalhes da impressora"
+                          >
+                            <PencilSimple size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Impressoras Tagment Disponíveis */}
+        {isTagmentConnected && tagmentPrinters.length > 0 && (
+          <div className={`mx-6 mb-6 p-6 rounded-xl border ${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                Impressoras Tagment Disponíveis
+              </h2>
+              <div className="flex items-center space-x-3">
+                <span className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
+                  {tagmentPrinters.length} impressora(s) encontrada(s)
+                </span>
+                <button
+                  onClick={() => reloadPrinters()}
+                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors flex items-center space-x-1"
+                >
+                  <ArrowClockwise size={14} />
+                  <span>Recarregar</span>
+                </button>
+                <button
+                  onClick={debugApi}
+                  className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  Debug API
+                </button>
+              </div>
+            </div>
+            
+            <div className="grid gap-3">
+              {tagmentPrinters.map((tagmentPrinter) => {
+                // Verificar se já está configurada no GranoBox
+                const isConfigured = granoboxPrinters.some(gp => gp.tagmentId === tagmentPrinter.id);
+                
+                return (
                   <div
-                    key={printer.id}
-                    className={`p-4 rounded-lg border ${
-                      theme === 'dark' ? 'bg-dark-700 border-dark-600' : 'bg-light-50 border-light-200'
+                    key={tagmentPrinter.id}
+                    className={`p-4 rounded-lg border transition-all ${
+                      isConfigured 
+                        ? theme === 'dark' ? 'bg-green-900/20 border-green-700' : 'bg-green-50 border-green-200'
+                        : theme === 'dark' ? 'bg-dark-700 border-dark-600 hover:border-dark-500' : 'bg-light-50 border-light-200 hover:border-light-300'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        {getStatusIcon(printer.isActive)}
+                        <div className={`w-3 h-3 rounded-full ${
+                          tagmentPrinter.status === 'online' ? 'bg-green-500' : 
+                          tagmentPrinter.status === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                        }`}></div>
                         <div>
                           <h3 className={`font-medium ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
-                            {(() => {
-                              // Buscar nome da impressora no Tagment
-                              const tagmentPrinter = tagmentPrinters.find(tp => tp.id === printer.tagmentId);
-                              return tagmentPrinter?.displayName || tagmentPrinter?.name || `Impressora ${printer.tagmentId.slice(0, 8)}`;
-                            })()}
+                            {tagmentPrinter.displayName || tagmentPrinter.name}
                           </h3>
                           <p className={`text-sm ${theme === 'dark' ? 'text-dark-400' : 'text-dark-600'}`}>
-                            {(() => {
-                              const tagmentPrinter = tagmentPrinters.find(tp => tp.id === printer.tagmentId);
-                              const connection = tagmentPrinter?.connection;
-                              return connection ? 
-                                `${connection.host}:${connection.port} • ${printer.location}` : 
-                                `ID: ${printer.tagmentId.slice(0, 8)} • ${printer.location}`;
-                            })()}
+                            {tagmentPrinter.connection ? 
+                              `${tagmentPrinter.connection.host}:${tagmentPrinter.connection.port}` : 
+                              `ID: ${tagmentPrinter.id.slice(0, 8)}`
+                            }
                           </p>
                           <p className={`text-xs ${theme === 'dark' ? 'text-dark-500' : 'text-dark-500'}`}>
-                            Uso: {getUsageLabel(printer.usage)}
+                            Status: {tagmentPrinter.status} • Hoje: {tagmentPrinter.printsToday || 0} impressões
                           </p>
                         </div>
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => testPrint(printer)}
-                          disabled={isLoading}
-                          className={`p-2 rounded-lg transition-colors ${
-                            theme === 'dark' ? 'text-green-400 hover:bg-green-900/20' : 'text-green-600 hover:bg-green-50'
-                          } disabled:opacity-50`}
-                          title="Teste de impressão"
-                        >
-                          <Play size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingPrinter(printer)
-                            setFormData({
-                              location: printer.location,
-                              usage: printer.usage,
-                              notes: printer.notes || '',
-                              isActive: printer.isActive
-                            })
-                            setShowForm(true)
-                          }}
-                          className={`p-2 rounded-lg transition-colors ${
-                            theme === 'dark' ? 'text-dark-400 hover:bg-dark-600' : 'text-dark-600 hover:bg-light-100'
-                          }`}
-                          title="Editar configurações da impressora"
-                        >
-                          <PencilSimple size={16} />
-                        </button>
+                        {isConfigured ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✓ Configurada
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              // Pré-preencher formulário com dados da impressora Tagment
+                              setFormData({
+                                location: tagmentPrinter.externalLocationId || '',
+                                usage: ['validity'], // Padrão para validade
+                                notes: `Sincronizada do Tagment: ${tagmentPrinter.displayName || tagmentPrinter.name}`,
+                                isActive: tagmentPrinter.status === 'online'
+                              });
+                              setEditingPrinter({
+                                id: '',
+                                tagmentId: tagmentPrinter.id,
+                                location: tagmentPrinter.externalLocationId || '',
+                                usage: ['validity'],
+                                isActive: tagmentPrinter.status === 'online',
+                                notes: '',
+                                clientId: user?.clientId || '',
+                                createdAt: '',
+                                updatedAt: ''
+                              });
+                              setShowForm(true);
+                            }}
+                            className="px-3 py-1 text-sm bg-primary text-white rounded hover:bg-primary/90 transition-colors"
+                          >
+                            + Configurar
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Footer Navigation */}

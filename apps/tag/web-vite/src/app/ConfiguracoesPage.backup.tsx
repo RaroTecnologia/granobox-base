@@ -32,7 +32,7 @@ import {
 } from '@phosphor-icons/react'
 import { toast } from 'react-hot-toast'
 import FooterNavigation from '@/components/FooterNavigation'
-import ImpressoraTab from '@/components/tabs/ImpressoraTab'
+import TagmentPrintersTab from '@/components/TagmentPrintersTab'
 
 export default function ConfiguracoesPage() {
   const navigate = useNavigate()
@@ -708,11 +708,108 @@ export default function ConfiguracoesPage() {
       <main className="px-4 pb-4">
         {/* Tab Impressora */}
         {activeTab === 'impressora' && (
-          <ImpressoraTab 
+          <TagmentPrintersTab 
             theme={theme}
             user={user}
           />
+        }
+                    
+                    return (
+                      <div
+                        key={printer.id}
+                        className={`p-4 rounded-xl border transition-colors ${
+                          theme === 'dark' 
+                            ? 'bg-dark-700 border-dark-600 hover:border-dark-500' 
+                            : 'bg-light-50 border-light-300 hover:border-light-400'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-4">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                              printer.isActive ? 'bg-green-100' : 'bg-red-100'
+                            }`}>
+                              <Printer size={24} className={printer.isActive ? 'text-green-600' : 'text-red-600'} />
+                            </div>
+                            
+                            <div>
+                              <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-dark-900'}`}>
+                                {tagmentPrinter?.displayName || tagmentPrinter?.name || printer.tagmentId.slice(0, 8)}
+                              </h3>
+                              <div className="flex items-center space-x-4 mt-1">
+                                {printer.location && (
+                                  <span className={`text-sm flex items-center ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                                    <MapPin size={14} className="mr-1" />
+                                    {printer.location}
+                                  </span>
+                                )}
+                                {tagmentPrinter && (
+                                  <span className={`text-sm ${theme === 'dark' ? 'text-dark-300' : 'text-dark-600'}`}>
+                                    {tagmentPrinter.connection?.host}:{tagmentPrinter.connection?.port}
+                                  </span>
+                                )}
+                              </div>
+                              {printer.usage && (
+                                <div className="flex items-center space-x-2 mt-2">
+                                  {printer.usage.includes('validity') && (
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                      Validade
+                                    </span>
+                                  )}
+                                  {printer.usage.includes('label') && (
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+                                      Rótulo
+                                    </span>
+                                  )}
+                                </div>
+              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              printer.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {printer.isActive ? 'Ativa' : 'Inativa'}
+                            </span>
+                            
+                            <button
+                              onClick={() => handleTestPrint(printer)}
+                              className="p-2 rounded-lg transition-colors bg-green-100 text-green-600 hover:bg-green-200"
+                              title="Teste de impressão"
+                            >
+                              <Play size={18} />
+                            </button>
+                            
+                            <button
+                              onClick={() => openPrinterModal(printer)}
+                              className={`p-2 rounded-lg transition-colors ${
+                                theme === 'dark' 
+                                  ? 'hover:bg-dark-600 text-dark-300' 
+                                  : 'hover:bg-light-100 text-dark-600'
+                              }`}
+                            >
+                              <PencilSimple size={18} />
+                            </button>
+                            
+                            <button
+                              onClick={() => handleDeletePrinter(printer.id)}
+                              className="p-2 rounded-lg transition-colors text-red-500 hover:bg-red-50"
+                            >
+                              <Trash size={18} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         )}
+
         {/* Tab Sistema */}
         {activeTab === 'sistema' && (
           <div className="space-y-6 animate-fade-in-up">
