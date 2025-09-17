@@ -1,13 +1,10 @@
+// IMPORTANTE: Importar polyfill ANTES de qualquer outro módulo
+import './crypto-polyfill';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
-
-// Polyfill para crypto no Node.js 18+
-import { webcrypto } from 'crypto';
-if (!globalThis.crypto) {
-  globalThis.crypto = webcrypto as any;
-}
 
 import { AppModule } from './app.module';
 
