@@ -247,10 +247,40 @@ export class CreateClientDto {
   @ApiProperty({
     description: 'API Key do Tagment para integração de impressão',
     required: false,
-    example: 'gbx_1234567890_abcdef',
+    example: 'tgm_7bf097a437f821a8219ecd09b375ca6900d012cbf45bb916d18ddc0253c8bda7',
   })
   @IsOptional()
   @IsString({ message: 'API Key do Tagment deve ser uma string' })
   @MaxLength(255, { message: 'API Key do Tagment deve ter no máximo 255 caracteres' })
   tagmentApiKey?: string;
+
+  @ApiProperty({
+    description: 'Customer ID no Tagment',
+    required: false,
+    example: 'gbx_padaria_do_joao',
+  })
+  @IsOptional()
+  @IsString({ message: 'Customer ID do Tagment deve ser uma string' })
+  @MaxLength(100, { message: 'Customer ID deve ter no máximo 100 caracteres' })
+  tagmentCustomerId?: string;
+
+  @ApiProperty({
+    description: 'Número SIF do cliente',
+    required: false,
+    example: '12345',
+  })
+  @IsOptional()
+  @IsString({ message: 'SIF deve ser uma string' })
+  @MaxLength(50, { message: 'SIF deve ter no máximo 50 caracteres' })
+  tagmentSif?: string;
+
+  @ApiProperty({
+    description: 'Marca padrão para etiquetas',
+    required: false,
+    example: 'TACCHINO',
+  })
+  @IsOptional()
+  @IsString({ message: 'Marca deve ser uma string' })
+  @MaxLength(100, { message: 'Marca deve ter no máximo 100 caracteres' })
+  tagmentBrand?: string;
 }

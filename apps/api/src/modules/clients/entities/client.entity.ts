@@ -136,6 +136,15 @@ export class Client {
   @Column({ nullable: true, length: 255 })
   tagmentApiKey?: string;
 
+  @Column({ nullable: true, length: 100 })
+  tagmentCustomerId?: string;
+
+  @Column({ nullable: true, length: 50 })
+  tagmentSif?: string;
+
+  @Column({ nullable: true, length: 100 })
+  tagmentBrand?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

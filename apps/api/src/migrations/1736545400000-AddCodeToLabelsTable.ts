@@ -47,3 +47,4 @@ export class AddCodeToLabelsTable1736545400000 implements MigrationInterface {
     await queryRunner.query(`ALTER TABLE "labels" DROP COLUMN "code"`);
   }
 }
+

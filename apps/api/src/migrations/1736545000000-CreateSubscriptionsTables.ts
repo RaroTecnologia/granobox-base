@@ -95,3 +95,4 @@ export class CreateSubscriptionsTables1736545000000 implements MigrationInterfac
   }
 }
 
+

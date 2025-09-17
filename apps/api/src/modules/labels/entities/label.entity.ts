@@ -72,6 +72,9 @@ export class Label {
   @Column('uuid')
   productId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  storageLocationId: string;
+
   @Column({ type: 'text', nullable: true })
   notes: string;
 

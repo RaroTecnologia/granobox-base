@@ -42,6 +42,10 @@ export class CreateLabelDto {
   productId: string;
 
   @IsOptional()
+  @IsUUID()
+  storageLocationId?: string;
+
+  @IsOptional()
   @IsString()
   notes?: string;
 

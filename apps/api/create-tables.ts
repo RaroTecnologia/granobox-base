@@ -171,3 +171,4 @@ createTables()
   .then(() => console.log('🎉 Script executado com sucesso!'))
   .catch((error) => console.error('💥 Erro fatal:', error));
 
+

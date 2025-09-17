@@ -78,3 +78,4 @@ export function generateUniqueCode(existingCodes: string[], maxAttempts: number 
   
   return code;
 }
+

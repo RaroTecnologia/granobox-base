@@ -24,6 +24,8 @@ import { LimitsModule } from './modules/limits/limits.module';
 import { LabelsModule } from './modules/labels/labels.module';
 import { PrintersModule } from './modules/printers/printers.module';
 import { OperatorsModule } from './modules/operators/operators.module';
+import { StorageLocationsModule } from './modules/storage-locations/storage-locations.module';
+import { TagmentModule } from './modules/tagment/tagment.module';
 
 @Module({
   imports: [
@@ -67,6 +69,8 @@ import { OperatorsModule } from './modules/operators/operators.module';
     LabelsModule,
     PrintersModule,
     OperatorsModule,
+    StorageLocationsModule,
+    TagmentModule,
     AppConfigModule,
   ],
   controllers: [AppController],

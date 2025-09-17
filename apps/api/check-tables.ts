@@ -64,3 +64,4 @@ checkTables()
   .then(() => console.log('🎉 Verificação concluída!'))
   .catch((error) => console.error('💥 Erro fatal:', error));
 
+
