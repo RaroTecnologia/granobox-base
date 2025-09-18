@@ -48,3 +48,4 @@ export class AddCodeToLabelsTable1736545400000 implements MigrationInterface {
   }
 }
 
+

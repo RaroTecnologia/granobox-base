@@ -145,6 +145,13 @@ export class Client {
   @Column({ nullable: true, length: 100 })
   tagmentBrand?: string;
 
+  // Configuração de impressoras Tagment
+  @Column({ nullable: true, length: 255 })
+  tagmentPrinterValidadeId?: string;
+
+  @Column({ nullable: true, length: 255 })
+  tagmentPrinterRotuloId?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

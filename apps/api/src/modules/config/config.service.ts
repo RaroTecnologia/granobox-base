@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { UpdateSystemConfigDto } from './dto/update-system-config.dto';
 import { UpdatePrinterConfigDto } from './dto/update-printer-config.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
+import { UpdateTagmentPrinterConfigDto } from './dto/update-tagment-printer-config.dto';
 
 @Injectable()
 export class ConfigService {
@@ -31,6 +32,11 @@ export class ConfigService {
     push: true,
     sound: false,
     expirationDays: 7,
+  };
+
+  private tagmentPrinterConfig = {
+    tagmentPrinterValidadeId: null as string | null,
+    tagmentPrinterRotuloId: null as string | null,
   };
 
   getSystemConfig() {
@@ -76,6 +82,15 @@ export class ConfigService {
     }
 
     return { url: logoUrl };
+  }
+
+  getTagmentPrinterConfig() {
+    return this.tagmentPrinterConfig;
+  }
+
+  updateTagmentPrinterConfig(updateTagmentPrinterConfigDto: UpdateTagmentPrinterConfigDto) {
+    this.tagmentPrinterConfig = { ...this.tagmentPrinterConfig, ...updateTagmentPrinterConfigDto };
+    return this.tagmentPrinterConfig;
   }
 }
 

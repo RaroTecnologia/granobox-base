@@ -172,3 +172,4 @@ createTables()
   .catch((error) => console.error('💥 Erro fatal:', error));
 
 
+

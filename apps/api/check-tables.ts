@@ -65,3 +65,4 @@ checkTables()
   .catch((error) => console.error('💥 Erro fatal:', error));
 
 
+

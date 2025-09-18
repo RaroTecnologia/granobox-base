@@ -23,6 +23,7 @@ import { ConfigService } from './config.service';
 import { UpdateSystemConfigDto } from './dto/update-system-config.dto';
 import { UpdatePrinterConfigDto } from './dto/update-printer-config.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
+import { UpdateTagmentPrinterConfigDto } from './dto/update-tagment-printer-config.dto';
 
 @ApiTags('Config')
 @ApiBearerAuth()
@@ -126,6 +127,33 @@ export class NotificationController {
     return this.configService.updateNotificationConfig(updateNotificationConfigDto);
   }
 }
+
+@Controller('tagment-printers')
+export class TagmentPrinterController {
+  constructor(private readonly configService: ConfigService) {}
+
+  @Get('config')
+  @ApiOperation({ summary: 'Obter configuração de impressoras Tagment' })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuração de impressoras Tagment',
+  })
+  getTagmentPrinterConfig() {
+    return this.configService.getTagmentPrinterConfig();
+  }
+
+  @Patch('config')
+  @ApiOperation({ summary: 'Atualizar configuração de impressoras Tagment' })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuração de impressoras Tagment atualizada com sucesso',
+  })
+  updateTagmentPrinterConfig(@Body() updateTagmentPrinterConfigDto: UpdateTagmentPrinterConfigDto) {
+    return this.configService.updateTagmentPrinterConfig(updateTagmentPrinterConfigDto);
+  }
+}
+
+
 
 
 

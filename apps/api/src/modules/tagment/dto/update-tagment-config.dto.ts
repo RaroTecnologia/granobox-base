@@ -3,3 +3,4 @@ import { CreateTagmentConfigDto } from './create-tagment-config.dto';
 
 export class UpdateTagmentConfigDto extends PartialType(CreateTagmentConfigDto) {}
 
+
