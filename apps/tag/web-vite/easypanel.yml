@@ -1,0 +1,30 @@
+# Configuração do Easypanel para Granobox Tag Web
+name: granobox-tag-web
+services:
+  - name: granobox-tag-web-app
+    image: 
+      dockerfile: Dockerfile
+      context: .
+    domains:
+      - host: tag.granobox.com.br
+    env:
+      - name: NODE_ENV
+        value: production
+    ports:
+      - published: 80
+        target: 80
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

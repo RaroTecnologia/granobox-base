@@ -5,7 +5,7 @@ export default function FooterNavigation() {
   const { theme } = useTheme()
 
   return (
-    <nav className={`${theme === 'dark' ? 'bg-dark-800 border-dark-700' : 'bg-white border-light-200'} border-t fixed bottom-0 left-0 right-0 px-4 py-3`}>
+    <nav className={`${theme === 'dark' ? 'bg-dark-900 border-dark-700' : 'bg-light-50 border-light-200'} border-t fixed bottom-0 left-0 right-0 px-4 py-3`}>
       <div className="flex items-center justify-around">
         <a 
           href="/dashboard" 

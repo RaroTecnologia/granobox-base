@@ -87,8 +87,8 @@ export default function NovaEtiquetaPage() {
             {tiposEtiqueta.map((tipo, index) => {
               // Tamanho maior para Validade (core da aplicação)
               const isValidade = tipo.id === 'validade'
-              const cardWidth = isValidade ? 'w-96' : 'w-80'
-              const cardPadding = isValidade ? 'p-12' : 'p-10'
+              const cardWidth = isValidade ? 'w-80 sm:w-96' : 'w-72 sm:w-80'
+              const cardPadding = isValidade ? 'p-8 sm:p-12' : 'p-6 sm:p-10'
               
               return (
                 <div
