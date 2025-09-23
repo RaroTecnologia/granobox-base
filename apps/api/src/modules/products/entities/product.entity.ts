@@ -29,6 +29,9 @@ export class Product {
   weightUnit: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  quantity: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   salePrice: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })

@@ -73,3 +73,5 @@ export class FixSubscriptionsTables1736545100000 implements MigrationInterface {
 
 
 
+
+

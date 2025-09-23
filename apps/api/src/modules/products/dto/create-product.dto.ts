@@ -29,6 +29,10 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsNumber()
+  quantity?: number;
+
+  @IsOptional()
+  @IsNumber()
   salePrice?: number;
 
   @IsOptional()

@@ -19,3 +19,5 @@ export class AddTagmentPrinterConfigToClients1758070300000 implements MigrationI
     `);
   }
 }
+
+

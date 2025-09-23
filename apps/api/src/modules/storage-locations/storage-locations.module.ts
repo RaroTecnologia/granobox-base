@@ -13,3 +13,5 @@ import { StorageLocation } from './entities/storage-location.entity';
 export class StorageLocationsModule {}
 
 
+
+
