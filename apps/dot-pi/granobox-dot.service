@@ -1,0 +1,27 @@
+[Unit]
+Description=Granobox Dot Pi - Leitor de QR Code
+Documentation=https://github.com/granobox/granobox
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=dialout
+WorkingDirectory=/home/pi/granobox-dot
+Environment="GRANOBOX_API_KEY=YOUR_API_KEY_HERE"
+Environment="GRANOBOX_API_URL=https://api.granobox.com.br"
+Environment="GRANOBOX_SERIAL_PORT=/dev/ttyS1"
+Environment="GRANOBOX_BAUD_RATE=9600"
+ExecStart=/home/pi/granobox-dot/dot
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
