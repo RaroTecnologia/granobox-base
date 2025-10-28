@@ -35,6 +35,14 @@ export class CreateLabelDto {
   @IsDateString()
   validityDate: string;
 
+  @IsOptional()
+  @IsString()
+  manufacturingBatch?: string;
+
+  @IsOptional()
+  @IsDateString()
+  expiryDate?: string;
+
   @IsUUID()
   clientId: string;
 
@@ -44,6 +52,11 @@ export class CreateLabelDto {
   @IsOptional()
   @IsUUID()
   storageLocationId?: string;
+
+  // ⭐ NOVO: Vínculo com operation
+  @IsOptional()
+  @IsUUID()
+  operationId?: string;
 
   @IsOptional()
   @IsString()
