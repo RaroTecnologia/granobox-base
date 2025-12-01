@@ -366,9 +366,7 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
       );
 
       if (mounted) {
-        // Atualizar o nome localmente
-        widget.edgeGoDevice.name = newName;
-        
+        // Nome será atualizado no próximo carregamento ou na lista de devices
         setState(() => _isLoading = false);
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -377,6 +375,9 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        
+        // Opcional: navegar de volta para forçar refresh da lista
+        // Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() => _isLoading = false);
