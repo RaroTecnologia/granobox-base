@@ -1,0 +1,36 @@
+device:
+  id: "edge-pro-default"
+  name: "Edge-Pro Device"
+  version: "1.0.0"
+  location: ""
+  hostname: ""
+
+socketio:
+  # Produção
+  server_url: "https://api.granobox.com.br"
+  
+  # Desenvolvimento local
+  # server_url: "http://localhost:3000"
+  
+  namespace: "/agents"
+  agent_fingerprint: ""  # Será gerado automaticamente
+  api_key: ""  # Será obtido do provisioning
+  reconnect_delay: 5
+  local_port: 3000
+
+api:
+  port: 8080
+  host: "0.0.0.0"
+
+display:
+  enabled: false  # true quando display RGB estiver conectado
+  service_url: "localhost:3006"
+  type: "rgb"
+
+printer:
+  auto_detect_usb: true
+  tcp_printers: []
+
+debug: false
+
+

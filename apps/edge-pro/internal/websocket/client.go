@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/granobox/edge-pro/internal/config"
 	"github.com/granobox/edge-pro/internal/metrics"
 	"github.com/granobox/edge-pro/internal/models"
+	"github.com/granobox/edge-pro/internal/ota"
 	"github.com/granobox/edge-pro/internal/printer"
 )
 
@@ -48,6 +50,8 @@ type Client struct {
 	// Watchdog USB
 	usbDisconnectedCycles int
 	lastUSBConnected      bool
+	// OTA Manager
+	otaManager *ota.OTAManager
 }
 
 // Message representa uma mensagem WebSocket pura
@@ -77,6 +81,7 @@ func NewClient(cfg *config.SocketIOConfig, deviceCfg *config.DeviceConfig, log z
 		handlers:          make(map[string]func(interface{})),
 		reconnectDelay:    5 * time.Second,
 		maxReconnectDelay: 60 * time.Second,
+		otaManager:        ota.NewOTAManager(logger, deviceCfg.Version),
 	}
 
 	if cfg != nil && cfg.APIKey != "" && cfg.AgentFingerprint != "" {
@@ -171,6 +176,21 @@ func (c *Client) setupHandlers() {
 			c.log.Warn().Msg("🔄 REINICIANDO AGORA!")
 			os.Exit(0) // Em produção, usar systemctl restart
 		}()
+	}
+
+	// Handler para OTA start
+	c.handlers["ota_start"] = func(data interface{}) {
+		c.handleOTAStart(data)
+	}
+
+	// Handler para OTA chunk
+	c.handlers["ota_chunk"] = func(data interface{}) {
+		c.handleOTAChunk(data)
+	}
+
+	// Handler para OTA finish
+	c.handlers["ota_finish"] = func(data interface{}) {
+		c.handleOTAFinish()
 	}
 }
 
@@ -1272,3 +1292,136 @@ func (c *Client) newHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{Timeout: timeout}
 }
 
+// === HANDLERS OTA ===
+
+// handleOTAStart processa início de OTA
+func (c *Client) handleOTAStart(data interface{}) {
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		c.log.Error().Msg("❌ Dados OTA inválidos")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": "Dados OTA inválidos",
+		})
+		return
+	}
+
+	version, _ := dataMap["version"].(string)
+	size, _ := dataMap["size"].(float64)
+	checksum, _ := dataMap["checksum"].(string)
+
+	if version == "" || size == 0 || checksum == "" {
+		c.log.Error().Msg("❌ Parâmetros OTA incompletos")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": "Parâmetros OTA incompletos",
+		})
+		return
+	}
+
+	c.log.Info().
+		Str("version", version).
+		Float64("size", size).
+		Str("checksum", checksum).
+		Msg("🔄 Iniciando OTA")
+
+	// Iniciar OTA
+	if err := c.otaManager.StartOTA(version, int64(size), checksum); err != nil {
+		c.log.Error().Err(err).Msg("❌ Erro ao iniciar OTA")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Notificar backend que está pronto
+	c.sendMessage("ota_ready", map[string]interface{}{
+		"version": version,
+		"message": "Pronto para receber firmware",
+	})
+
+	c.log.Info().Msg("✅ OTA iniciado, pronto para receber chunks")
+}
+
+// handleOTAChunk processa um chunk do firmware
+func (c *Client) handleOTAChunk(data interface{}) {
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		c.log.Error().Msg("❌ Dados de chunk OTA inválidos")
+		return
+	}
+
+	sequence, _ := dataMap["sequence"].(float64)
+	chunkDataBase64, _ := dataMap["data"].(string)
+
+	if chunkDataBase64 == "" {
+		c.log.Error().Msg("❌ Chunk OTA vazio")
+		return
+	}
+
+	// Decodificar base64
+	chunkData, err := base64.StdEncoding.DecodeString(chunkDataBase64)
+	if err != nil {
+		c.log.Error().Err(err).Msg("❌ Erro ao decodificar chunk base64")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": fmt.Sprintf("Erro ao decodificar chunk: %v", err),
+		})
+		return
+	}
+
+	// Processar chunk
+	if err := c.otaManager.ProcessChunk(int(sequence), chunkData); err != nil {
+		c.log.Error().Err(err).Msg("❌ Erro ao processar chunk")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Enviar ACK com progresso
+	progress := c.otaManager.GetProgress()
+	bytesReceived := c.otaManager.GetBytesReceived()
+	c.sendMessage("ota_chunk_ack", map[string]interface{}{
+		"sequence":      int(sequence),
+		"progress":      progress,
+		"bytes_received": bytesReceived,
+	})
+
+	c.log.Debug().
+		Int("sequence", int(sequence)).
+		Int("progress", progress).
+		Msg("📦 Chunk OTA processado")
+}
+
+// handleOTAFinish finaliza OTA e instala novo binário
+func (c *Client) handleOTAFinish() {
+	c.log.Info().Msg("🔍 Finalizando OTA...")
+
+	// Finalizar OTA (valida checksum e substitui binário)
+	if err := c.otaManager.FinishOTA(); err != nil {
+		c.log.Error().Err(err).Msg("❌ Erro ao finalizar OTA")
+		c.sendMessage("ota_error", map[string]interface{}{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Notificar sucesso
+	c.sendMessage("ota_success", map[string]interface{}{
+		"version": c.otaManager.GetVersion(),
+		"message": "OTA concluído com sucesso",
+	})
+
+	c.log.Info().Msg("✅ OTA concluído, reiniciando serviço...")
+
+	// Aguardar 2 segundos para mensagem ser enviada
+	time.Sleep(2 * time.Second)
+
+	// Reiniciar serviço
+	if err := c.otaManager.RestartService(); err != nil {
+		c.log.Error().Err(err).Msg("❌ Erro ao reiniciar serviço")
+		// Mesmo assim, sair para systemd reiniciar
+	}
+
+	// Sair (systemd vai reiniciar automaticamente)
+	c.log.Warn().Msg("🔄 REINICIANDO APÓS OTA!")
+	os.Exit(0)
+}

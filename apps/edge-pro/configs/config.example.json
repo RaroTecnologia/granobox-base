@@ -1,0 +1,27 @@
+{
+  "device": {
+    "id": "edge-rpi-001",
+    "name": "Raspberry Pi - Loja Principal",
+    "version": "2.0.0",
+    "location": "Balcão - Loja 1",
+    "hostname": "rpi-balcao"
+  },
+  "socketio": {
+    "server_url": "https://api.granobox.com.br",
+    "api_key": "tgm_your_api_key_here_replace_with_real_key",
+    "namespace": "/agents",
+    "agent_fingerprint": "edge-rpi-001",
+    "reconnect_delay": 5
+  },
+  "api": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "display": {
+    "enabled": true,
+    "service_url": "localhost:3006",
+    "type": "rgb"
+  },
+  "debug": false
+}
+

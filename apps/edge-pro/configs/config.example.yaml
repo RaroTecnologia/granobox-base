@@ -1,0 +1,27 @@
+# Edge-Pro - Configuração de Exemplo
+# Copie para config.yaml e ajuste conforme necessário
+
+device:
+  id: ""  # Gerado automaticamente se vazio
+  version: "1.0.0"
+  name: "Edge-Pro Device"
+  location: ""
+  hostname: ""
+
+socketio:
+  server_url: "https://api.granobox.com.br"
+  namespace: "/agents"
+  api_key: ""  # Gerado pelo backend após provisionamento
+  agent_fingerprint: ""  # Gerado automaticamente
+  reconnect_delay: 5
+
+api:
+  host: "0.0.0.0"
+  port: 8080
+
+display:
+  enabled: false
+  service_url: "localhost:3006"
+  type: "rgb"  # rgb, oled, none
+
+debug: false

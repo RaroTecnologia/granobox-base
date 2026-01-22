@@ -1,0 +1,472 @@
+package socketio
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"sync"
+	"time"
+
+	socketio "github.com/maldikhan/go.socket.io"
+	"github.com/rs/zerolog"
+
+	"github.com/tagment/edge/internal/config"
+	"github.com/tagment/edge/internal/metrics"
+	"github.com/tagment/edge/internal/models"
+	"github.com/tagment/edge/internal/printer"
+)
+
+type Client struct {
+	cfg              *config.SocketIOConfig
+	deviceCfg        *config.DeviceConfig
+	log              zerolog.Logger
+	client           *socketio.Client
+	connected        bool
+	mu               sync.RWMutex
+	metricsCollector *metrics.Collector
+	printerManager   *printer.Manager
+	printers         []models.PrinterInfo
+}
+
+func NewClient(cfg *config.SocketIOConfig, deviceCfg *config.DeviceConfig, log zerolog.Logger) *Client {
+	return &Client{
+		cfg:              cfg,
+		deviceCfg:        deviceCfg,
+		log:              log.With().Str("component", "socketio-client").Logger(),
+		metricsCollector: metrics.NewCollector(log),
+		printerManager:   printer.NewManager(log),
+		printers:         []models.PrinterInfo{},
+	}
+}
+
+func (c *Client) Connect() error {
+	c.log.Info().
+		Str("server", c.cfg.ServerURL).
+		Str("namespace", c.cfg.Namespace).
+		Msg("🔌 Iniciando conexão Socket.IO...")
+
+	// Configurar opções do cliente
+	opts := &socketio.ClientOptions{
+		Transports: []string{"websocket"},
+		Query: map[string]string{
+			"token": c.cfg.APIKey,
+		},
+	}
+
+	// Criar cliente
+	client, err := socketio.NewClient(c.cfg.ServerURL, opts)
+	if err != nil {
+		return fmt.Errorf("erro ao criar cliente Socket.IO: %w", err)
+	}
+
+	c.client = client
+	c.setupHandlers()
+
+	// Conectar ao namespace
+	if err := c.client.Connect(c.cfg.Namespace); err != nil {
+		return fmt.Errorf("erro ao conectar ao namespace %s: %w", c.cfg.Namespace, err)
+	}
+
+	c.mu.Lock()
+	c.connected = true
+	c.mu.Unlock()
+
+	c.log.Info().Msg("✅ Conectado ao Socket.IO")
+	return nil
+}
+
+func (c *Client) setupHandlers() {
+	// Handler: connect
+	c.client.On("connect", func(data ...interface{}) {
+		c.log.Info().Msg("✅ Evento 'connect' recebido")
+		c.mu.Lock()
+		c.connected = true
+		c.mu.Unlock()
+
+		// Aguardar 1 segundo antes de registrar
+		time.AfterFunc(1*time.Second, func() {
+			if err := c.sendRegister(); err != nil {
+				c.log.Error().Err(err).Msg("Erro ao enviar registro")
+			}
+		})
+	})
+
+	// Handler: disconnect
+	c.client.On("disconnect", func(data ...interface{}) {
+		c.log.Warn().Msg("⚠️ Desconectado do servidor")
+		c.mu.Lock()
+		c.connected = false
+		c.mu.Unlock()
+	})
+
+	// Handler: connection-established
+	c.client.On("connection-established", func(data ...interface{}) {
+		c.log.Info().Msg("✅ Conexão estabelecida pelo servidor")
+	})
+
+	// Handler: agent-registered
+	c.client.On("agent-registered", func(data ...interface{}) {
+		c.log.Info().Msg("✅ Agent registrado com sucesso!")
+	})
+
+	// Handler: heartbeat-ack
+	c.client.On("heartbeat-ack", func(data ...interface{}) {
+		c.log.Debug().Msg("💓 Heartbeat ACK recebido")
+	})
+
+	// Handler: printers-update
+	c.client.On("printers-update", func(data ...interface{}) {
+		c.log.Info().Msg("🖨️ Atualização de impressoras recebida")
+		if len(data) > 0 {
+			c.processPrintersUpdate(data[0])
+		}
+	})
+
+	// Handler: print-job
+	c.client.On("print-job", func(data ...interface{}) {
+		c.log.Info().Msg("📄 Job de impressão recebido")
+		if len(data) > 0 {
+			c.processPrintJob(data[0])
+		}
+	})
+
+	// Handler: agent-command
+	c.client.On("agent-command", func(data ...interface{}) {
+		c.log.Info().Msg("⚡ Comando do servidor recebido")
+		if len(data) > 0 {
+			c.processAgentCommand(data[0])
+		}
+	})
+
+	// Handler: error
+	c.client.On("error", func(data ...interface{}) {
+		c.log.Error().Interface("data", data).Msg("❌ Erro recebido do servidor")
+	})
+}
+
+func (c *Client) sendRegister() error {
+	c.log.Info().Msg("📝 Preparando registro do agent...")
+
+	// Obter métricas do sistema
+	systemMetrics := c.metricsCollector.GetSystemMetrics()
+
+	// Obter hostname
+	hostname := c.deviceCfg.Hostname
+	if hostname == "" {
+		if h, err := os.Hostname(); err == nil {
+			hostname = h
+		}
+	}
+
+	// Obter nome do dispositivo
+	deviceName := c.deviceCfg.Name
+	if deviceName == "" {
+		deviceName = c.deviceCfg.ID
+	}
+
+	// Auto-detectar e criar impressoras USB
+	usbPrinters, err := c.printerManager.CreateAutoUSBPrinters()
+	if err != nil {
+		c.log.Warn().Err(err).Msg("Erro ao auto-detectar impressoras USB")
+	} else {
+		c.log.Info().Int("count", len(usbPrinters)).Msg("✨ Impressoras USB auto-detectadas")
+		c.printers = usbPrinters
+		c.printerManager.LoadPrinters(usbPrinters)
+	}
+
+	// Converter impressoras para formato de registro
+	printersForRegister := make([]map[string]interface{}, len(c.printers))
+	for i, p := range c.printers {
+		printerMap := map[string]interface{}{
+			"name":       p.Name,
+			"status":     p.Status,
+			"connection": p.Connection,
+		}
+		if p.ID != nil {
+			printerMap["id"] = *p.ID
+		}
+		if p.ExternalPrinterRef != nil {
+			printerMap["externalPrinterRef"] = *p.ExternalPrinterRef
+		}
+		if p.Model != "" {
+			printerMap["model"] = p.Model
+		}
+		if p.Type != "" {
+			printerMap["type"] = p.Type
+		}
+		if p.DevicePath != nil {
+			printerMap["devicePath"] = *p.DevicePath
+		}
+		printersForRegister[i] = printerMap
+	}
+
+	agentData := map[string]interface{}{
+		"fingerprint": c.cfg.AgentFingerprint,
+		"name":        deviceName,
+		"hostname":    hostname,
+		"location":    c.deviceCfg.Location,
+		"version":     c.deviceCfg.Version,
+		"ip":          systemMetrics.IP,
+		"mac":         systemMetrics.MAC,
+		"printers":    printersForRegister,
+		"capabilities": []string{
+			"print",
+			"remote-command",
+			"usb-auto-detect",
+		},
+	}
+
+	c.log.Info().
+		Str("fingerprint", c.cfg.AgentFingerprint).
+		Str("name", deviceName).
+		Int("printers", len(c.printers)).
+		Msg("📝 Enviando agent-register...")
+
+	return c.Emit("agent-register", agentData)
+}
+
+func (c *Client) SendHeartbeat() error {
+	if !c.IsConnected() {
+		return fmt.Errorf("cliente não conectado")
+	}
+
+	// Obter métricas do sistema
+	systemMetrics := c.metricsCollector.GetSystemMetrics()
+
+	// Detectar dispositivos USB para incluir no heartbeat
+	usbDevices := c.printerManager.DetectUSBPrinters()
+
+	heartbeat := map[string]interface{}{
+		"fingerprint":   c.cfg.AgentFingerprint,
+		"uptimeSeconds": systemMetrics.Uptime,
+		"cpuUsage":      systemMetrics.CPUUsage,
+		"memoryUsage":   systemMetrics.MemoryUsage,
+		"temperature":   systemMetrics.Temperature,
+		"diskUsage":     systemMetrics.DiskUsage,
+		"ip":            systemMetrics.IP,
+		"mac":           systemMetrics.MAC,
+		"usbDevices":    usbDevices,
+	}
+
+	c.log.Info().
+		Float64("cpu", systemMetrics.CPUUsage).
+		Float64("memory", systemMetrics.MemoryUsage).
+		Float64("temp", systemMetrics.Temperature).
+		Int64("uptime", systemMetrics.Uptime).
+		Msg("💓 Enviando heartbeat...")
+
+	return c.Emit("heartbeat", heartbeat)
+}
+
+func (c *Client) StartHeartbeat(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	c.log.Info().Dur("interval", interval).Msg("💓 Heartbeat iniciado")
+
+	for range ticker.C {
+		if c.IsConnected() {
+			if err := c.SendHeartbeat(); err != nil {
+				c.log.Error().Err(err).Msg("Erro ao enviar heartbeat")
+			}
+		}
+	}
+}
+
+func (c *Client) processPrintJob(data interface{}) {
+	jobData, err := json.Marshal(data)
+	if err != nil {
+		c.log.Error().Err(err).Msg("Erro ao serializar job de impressão")
+		return
+	}
+
+	var job models.PrintJob
+	if err := json.Unmarshal(jobData, &job); err != nil {
+		c.log.Error().Err(err).Msg("Erro ao parsear job de impressão")
+		return
+	}
+
+	c.log.Info().
+		Str("job_id", job.JobID).
+		Str("printer_id", job.PrinterID).
+		Int("copies", job.Copies).
+		Msg("📄 Processando job de impressão")
+
+	result := models.PrintJobResult{
+		JobID:     job.JobID,
+		Status:    "processing",
+		Message:   "Job de impressão em processamento",
+		PrintedAt: time.Now(),
+	}
+
+	// Determinar qual impressora usar
+	var targetPrinter *models.PrinterInfo
+
+	if job.PrinterID == "USE_FIRST_AVAILABLE" || job.PrinterID == "" {
+		targetPrinter, err = c.printerManager.GetFirstAvailable()
+		if err != nil {
+			c.log.Error().Err(err).Msg("Nenhuma impressora disponível")
+			result.Status = "error"
+			result.Error = fmt.Sprintf("Nenhuma impressora disponível: %v", err)
+			c.Emit("print-job-result", result)
+			return
+		}
+	} else {
+		targetPrinter, err = c.printerManager.GetPrinter(job.PrinterID)
+		if err != nil {
+			c.log.Error().Err(err).Str("printer_id", job.PrinterID).Msg("Impressora não encontrada")
+			result.Status = "error"
+			result.Error = fmt.Sprintf("Impressora não encontrada: %v", err)
+			c.Emit("print-job-result", result)
+			return
+		}
+	}
+
+	c.log.Info().
+		Str("printer_name", targetPrinter.Name).
+		Str("connection", targetPrinter.Connection).
+		Msg("🖨️ Impressora selecionada")
+
+	if job.ZPL == "" {
+		c.log.Error().Msg("Job sem dados ZPL")
+		result.Status = "error"
+		result.Error = "Job sem dados ZPL"
+		c.Emit("print-job-result", result)
+		return
+	}
+
+	copies := job.Copies
+	if copies <= 0 {
+		copies = 1
+	}
+
+	for i := 0; i < copies; i++ {
+		c.log.Debug().Int("copy", i+1).Int("total", copies).Msg("Imprimindo cópia")
+
+		err = c.printerManager.SendToPrinter(targetPrinter, []byte(job.ZPL))
+		if err != nil {
+			c.log.Error().Err(err).Int("copy", i+1).Msg("Erro ao imprimir")
+			result.Status = "error"
+			result.Error = fmt.Sprintf("Erro ao imprimir cópia %d/%d: %v", i+1, copies, err)
+			c.Emit("print-job-result", result)
+			return
+		}
+	}
+
+	result.Status = "success"
+	result.Message = fmt.Sprintf("Impressão concluída com sucesso (%d cópias)", copies)
+
+	c.log.Info().
+		Str("job_id", job.JobID).
+		Str("status", result.Status).
+		Int("copies", copies).
+		Msg("✅ Job processado")
+
+	c.Emit("print-job-result", result)
+}
+
+func (c *Client) processAgentCommand(data interface{}) {
+	cmdData, err := json.Marshal(data)
+	if err != nil {
+		c.log.Error().Err(err).Msg("Erro ao serializar comando")
+		return
+	}
+
+	var cmd models.AgentCommand
+	if err := json.Unmarshal(cmdData, &cmd); err != nil {
+		c.log.Error().Err(err).Msg("Erro ao parsear comando")
+		return
+	}
+
+	c.log.Info().
+		Str("command_id", cmd.CommandID).
+		Str("type", cmd.Type).
+		Msg("Processando comando do servidor")
+
+	response := models.CommandResponse{
+		CommandID: cmd.CommandID,
+		Status:    "processing",
+		Timestamp: time.Now(),
+	}
+
+	switch cmd.Type {
+	case "update_config":
+		c.log.Info().Msg("Atualizando configuração...")
+		response.Status = "success"
+		response.Message = "Configuração atualizada com sucesso"
+
+	case "restart":
+		c.log.Warn().Msg("Comando de restart recebido")
+		response.Status = "success"
+		response.Message = "Restart agendado"
+
+	case "update_printers":
+		c.log.Info().Msg("Atualizando lista de impressoras...")
+		response.Status = "success"
+		response.Message = "Lista de impressoras atualizada"
+
+	case "display_message":
+		c.log.Info().Msg("Exibindo mensagem no display...")
+		response.Status = "success"
+		response.Message = "Mensagem exibida no display"
+
+	default:
+		c.log.Warn().Str("type", cmd.Type).Msg("Tipo de comando desconhecido")
+		response.Status = "error"
+		response.Message = fmt.Sprintf("Tipo de comando desconhecido: %s", cmd.Type)
+	}
+
+	c.log.Info().
+		Str("command_id", cmd.CommandID).
+		Str("status", response.Status).
+		Msg("Comando processado")
+
+	c.Emit("command-response", response)
+}
+
+func (c *Client) processPrintersUpdate(data interface{}) {
+	printersData, err := json.Marshal(data)
+	if err != nil {
+		c.log.Error().Err(err).Msg("Erro ao serializar impressoras")
+		return
+	}
+
+	var printers []models.PrinterInfo
+	if err := json.Unmarshal(printersData, &printers); err != nil {
+		c.log.Error().Err(err).Msg("Erro ao parsear impressoras")
+		return
+	}
+
+	c.printers = printers
+	c.printerManager.LoadPrinters(printers)
+	c.log.Info().Int("count", len(printers)).Msg("✅ Impressoras atualizadas")
+}
+
+func (c *Client) Emit(event string, data interface{}) error {
+	if !c.IsConnected() {
+		return fmt.Errorf("cliente não conectado")
+	}
+
+	c.log.Debug().Str("event", event).Msg("Emitindo evento")
+	return c.client.Emit(c.cfg.Namespace, event, data)
+}
+
+func (c *Client) IsConnected() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.connected
+}
+
+func (c *Client) Disconnect() error {
+	c.log.Info().Msg("Desconectando...")
+	if c.client != nil {
+		return c.client.Close()
+	}
+	return nil
+}
+
+func (c *Client) UpdatePrinters(printers []models.PrinterInfo) {
+	c.printers = printers
+	c.printerManager.LoadPrinters(printers)
+	c.log.Info().Int("count", len(printers)).Msg("Impressoras atualizadas")
+}
