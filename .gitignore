@@ -152,3 +152,4 @@ docs/_build/
 config.local.js
 settings.local.json
 
+apps/dot-pi/*.img.xz

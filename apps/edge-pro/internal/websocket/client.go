@@ -21,6 +21,12 @@ import (
 )
 
 // Client é o cliente WebSocket puro (não Socket.IO)
+// Constantes do watchdog USB
+const (
+	USBWatchdogCheckInterval = 5 * time.Second  // Verificar a cada 5 segundos
+	USBWatchdogMaxCycles     = 12               // 12 ciclos * 5s = 1 minuto
+)
+
 type Client struct {
 	cfg              *config.SocketIOConfig
 	deviceCfg        *config.DeviceConfig
@@ -39,6 +45,9 @@ type Client struct {
 	certManager      *certmanager.Manager
 	reconnectDelay   time.Duration
 	maxReconnectDelay time.Duration
+	// Watchdog USB
+	usbDisconnectedCycles int
+	lastUSBConnected      bool
 }
 
 // Message representa uma mensagem WebSocket pura
@@ -89,6 +98,9 @@ func NewClient(cfg *config.SocketIOConfig, deviceCfg *config.DeviceConfig, log z
 
 	// Monitorar resultados da fila
 	go client.monitorPrintResults()
+
+	// 🆕 Iniciar watchdog USB (monitora se impressora desconecta)
+	go client.startUSBWatchdog()
 
 	// Setup handlers
 	client.setupHandlers()
@@ -330,6 +342,8 @@ func (c *Client) startWebSocketPing() {
 	}
 
 	c.pingTicker = time.NewTicker(30 * time.Second)
+	pingFailures := 0
+	const maxPingFailures = 3 // Forçar reconexão após 3 falhas consecutivas (90 segundos)
 
 	go func() {
 		for {
@@ -346,10 +360,32 @@ func (c *Client) startWebSocketPing() {
 
 				// Enviar WebSocket PING
 				if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(5*time.Second)); err != nil {
-					c.log.Debug().Err(err).Msg("Erro ao enviar WebSocket PING")
-					return
+					pingFailures++
+					c.log.Warn().
+						Err(err).
+						Int("failures", pingFailures).
+						Int("max_failures", maxPingFailures).
+						Msg("⚠️  Erro ao enviar WebSocket PING")
+
+					// Se falhar N vezes consecutivas, forçar reconexão
+					if pingFailures >= maxPingFailures {
+						c.log.Error().Msg("❌ Watchdog WebSocket: Muitas falhas de PING, forçando reconexão...")
+						c.mu.Lock()
+						c.connected = false
+						if conn != nil {
+							conn.Close()
+						}
+						c.mu.Unlock()
+						return
+					}
+				} else {
+					// Reset contador em caso de sucesso
+					if pingFailures > 0 {
+						c.log.Info().Msg("✅ WebSocket PING OK, resetando contador de falhas")
+						pingFailures = 0
+					}
+					c.log.Debug().Msg("🏓 WebSocket PING enviado")
 				}
-				c.log.Debug().Msg("🏓 WebSocket PING enviado")
 
 			case <-c.stopCh:
 				return
@@ -481,10 +517,14 @@ func (c *Client) sendRegister() error {
 		},
 	}
 
-	// Usar clientId REAL se disponível, senão usar o fingerprint
-	// ⚠️ TEMPORÁRIO: Usar UUID hardcoded para teste
-	clientId := "e1ca6b81-8399-469d-9a63-d23724ead998"
-	c.log.Info().Str("clientId", clientId).Msg("✅ Usando clientId HARDCODED para teste")
+	// Usar clientId REAL obtido via /auth/device
+	clientId := c.deviceCfg.ClientID
+	if clientId == "" {
+		c.log.Warn().Msg("⚠️  ClientID não obtido do backend, usando fingerprint como fallback")
+		clientId = c.cfg.AgentFingerprint
+	} else {
+		c.log.Info().Str("clientId", clientId).Msg("✅ Usando clientId obtido do backend")
+	}
 
 	c.log.Info().
 		Str("deviceId", c.cfg.AgentFingerprint).
@@ -620,6 +660,8 @@ func (c *Client) SendHeartbeat() error {
 		"mac":            macAddr,
 		"printers":       printersForHeartbeat,
 		"queueStats":     queueStats,
+		"version":        c.deviceCfg.Version,  // 🆕 Versão do firmware para o backend salvar
+		"platform":       "linux-arm64",        // 🆕 Plataforma (Raspberry Pi)
 	}
 
 	c.log.Info().
@@ -1037,6 +1079,73 @@ func (c *Client) handlePrinterPing(data interface{}) {
 		Msg("✅ Status da impressora enviado")
 }
 
+// startUSBWatchdog monitora a impressora USB e reinicia se ficar desconectada por muito tempo
+func (c *Client) startUSBWatchdog() {
+	c.log.Info().
+		Dur("interval", USBWatchdogCheckInterval).
+		Int("max_cycles", USBWatchdogMaxCycles).
+		Msg("🔍 Iniciando watchdog USB")
+
+	ticker := time.NewTicker(USBWatchdogCheckInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.stopCh:
+			c.log.Info().Msg("🛑 Watchdog USB parado")
+			return
+		case <-ticker.C:
+			// Verificar se há impressoras USB conectadas
+			usbPrinters := c.printerManager.CreateAutoUSBPrinters()
+			usbConnected := len(usbPrinters) > 0
+
+			if usbConnected {
+				// Impressora conectada, resetar contador
+				if c.usbDisconnectedCycles > 0 {
+					c.log.Info().Msg("✅ Impressora USB reconectada, resetando watchdog")
+					c.usbDisconnectedCycles = 0
+				}
+				c.lastUSBConnected = true
+			} else {
+				// Impressora desconectada
+				if c.lastUSBConnected {
+					c.log.Warn().Msg("⚠️  Impressora USB desconectada!")
+				}
+				c.lastUSBConnected = false
+				c.usbDisconnectedCycles++
+
+				c.log.Warn().
+					Int("cycle", c.usbDisconnectedCycles).
+					Int("max_cycles", USBWatchdogMaxCycles).
+					Msg("🔄 Impressora USB desconectada - aguardando reconexão...")
+
+				// Watchdog: se passou muito tempo desconectada, reiniciar
+				if c.usbDisconnectedCycles >= USBWatchdogMaxCycles {
+					c.log.Error().
+						Int("cycles", c.usbDisconnectedCycles).
+						Msg("❌ Watchdog USB: Impressora desconectada há 1 minuto")
+					c.log.Error().Msg("🔄 Reiniciando Edge-Pro para forçar reconexão USB...")
+
+					// Notificar backend antes de reiniciar
+					c.sendMessage("reboot_notification", map[string]interface{}{
+						"reason":    "usb_watchdog",
+						"message":   "Impressora USB desconectada por muito tempo",
+						"cycles":    c.usbDisconnectedCycles,
+						"timestamp": time.Now().UnixMilli(),
+					})
+
+					// Aguardar 2 segundos para mensagem ser enviada
+					time.Sleep(2 * time.Second)
+
+					// Reiniciar (via systemctl em produção, exit em dev)
+					c.log.Error().Msg("🔄 REINICIANDO AGORA!")
+					os.Exit(1) // Systemd vai reiniciar automaticamente
+				}
+			}
+		}
+	}
+}
+
 func (c *Client) IsConnected() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -1107,23 +1216,16 @@ func (c *Client) registerPrintersWithBackend() {
 			printerName = fmt.Sprintf("Edge-Pro %s", c.cfg.AgentFingerprint[len(c.cfg.AgentFingerprint)-8:])
 		}
 
-		// ⚠️ TEMPORÁRIO: Usar edge-go- ao invés de edge-pro- para compatibilidade com API
-		deviceIdForPrinter := c.cfg.AgentFingerprint
-		if strings.HasPrefix(deviceIdForPrinter, "edge-pro-") {
-			deviceIdForPrinter = strings.Replace(deviceIdForPrinter, "edge-pro-", "edge-go-", 1)
-			c.log.Warn().Str("original", c.cfg.AgentFingerprint).Str("converted", deviceIdForPrinter).
-				Msg("⚠️  Usando edge-go- prefixo temporário para compatibilidade com API")
-		}
-
-		payload := map[string]interface{}{
-			"name":         printerName,
-			"type":         "edge",
-			"deviceId":     deviceIdForPrinter, // ⚠️ edge-go- temporário
-			"ip":           localIP,
-			"port":         9100,
-			"isUSBPrinter": true,
-			"status":       "active",
-		}
+	// Usar o deviceId correto (edge-pro-)
+	payload := map[string]interface{}{
+		"name":         printerName,
+		"type":         "edge",
+		"deviceId":     c.cfg.AgentFingerprint, // ✅ Usar prefixo correto edge-pro-
+		"ip":           localIP,
+		"port":         9100,
+		"isUSBPrinter": true,
+		"status":       "active",
+	}
 
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
