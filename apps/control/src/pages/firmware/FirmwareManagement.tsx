@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useFirmware, type Device, type OtaStatus, type Firmware, type Platform } from '../../hooks/useFirmware';
+import { useFirmware, type Device, type OtaStatus, type Firmware } from '../../hooks/useFirmware';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -17,7 +17,7 @@ export default function FirmwareManagement() {
   const [availableFirmwares, setAvailableFirmwares] = useState<Firmware[]>([]);
   const [selectedFirmwareKey, setSelectedFirmwareKey] = useState<string>('');
   const [useExisting, setUseExisting] = useState(true);
-  const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'all'>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<'edge-go' | 'edge-pro' | 'all'>('all');
 
   // Carregar dispositivos e firmwares ao montar
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function FirmwareManagement() {
     }
 
     try {
-      const firmware = await uploadFirmware(selectedFile, version, selectedPlatform as Platform);
+      const firmware = await uploadFirmware(selectedFile, version);
       setUploadedFirmware(firmware);
       
       // Recarregar lista de firmwares e selecionar o novo
@@ -145,32 +145,46 @@ export default function FirmwareManagement() {
       return;
     }
 
-    // Validar compatibilidade de plataforma
     const selectedDeviceList = devices.filter(d => selectedDevices.has(d.deviceId));
-    const incompatibleDevices = selectedDeviceList.filter(
-      d => d.platform && uploadedFirmware.platform && d.platform !== uploadedFirmware.platform
-    );
-
-    if (incompatibleDevices.length > 0) {
-      const incompatibleNames = incompatibleDevices.map(d => d.name || d.deviceId).join(', ');
-      alert(
-        `Erro: O firmware selecionado é para ${uploadedFirmware.platform}, mas os seguintes dispositivos são ${incompatibleDevices[0].platform}:\n${incompatibleNames}\n\nSelecione apenas dispositivos compatíveis.`
-      );
-      return;
-    }
-
     const versionText = uploadedFirmware.version || 'versão desconhecida';
-    const platformText = uploadedFirmware.platform || 'desconhecida';
-    if (!confirm(`Deseja atualizar ${selectedDevices.size} dispositivo(s) ${platformText} para a versão ${versionText}?`)) {
+    
+    if (!confirm(`Deseja atualizar ${selectedDevices.size} dispositivo(s) para a versão ${versionText}?`)) {
       return;
     }
 
     try {
       const deviceIds = Array.from(selectedDevices);
+      
+      console.log('🔄 [OTA] Iniciando OTA para dispositivos:', deviceIds);
+      console.log('🔄 [OTA] Dispositivos selecionados:', selectedDeviceList.map(d => ({
+        deviceId: d.deviceId,
+        name: d.name,
+        status: d.status
+      })));
+      console.log('🔄 [OTA] Firmware:', {
+        version: uploadedFirmware.version,
+        url: uploadedFirmware.url
+      });
+      
       const results = await startOta(deviceIds, uploadedFirmware.url, uploadedFirmware.version, checksum);
+      
+      // ⭐ NOVO: Verificar resultados e mostrar erros detalhados
+      const failedDevices = Object.entries(results)
+        .filter(([_, status]) => status.status === 'failed')
+        .map(([deviceId, status]) => ({ deviceId, error: status.error }));
+      
+      if (failedDevices.length > 0) {
+        const errorMessage = failedDevices
+          .map(f => `• ${f.deviceId}: ${f.error}`)
+          .join('\n');
+        alert(`Erro ao iniciar OTA para alguns dispositivos:\n\n${errorMessage}`);
+      } else {
+        alert(`OTA iniciado para ${deviceIds.length} dispositivo(s)!`);
+      }
+      
       setOtaStatuses(results);
-      alert(`OTA iniciado para ${deviceIds.length} dispositivo(s)!`);
     } catch (err) {
+      console.error('❌ [OTA] Erro ao iniciar OTA:', err);
       alert(`Erro ao iniciar OTA: ${err}`);
     }
   };
@@ -248,7 +262,7 @@ export default function FirmwareManagement() {
                 </label>
                 <select
                   value={selectedPlatform}
-                  onChange={(e) => setSelectedPlatform(e.target.value as Platform | 'all')}
+                  onChange={(e) => setSelectedPlatform(e.target.value as 'edge-go' | 'edge-pro' | 'all')}
                   className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">Todas as plataformas</option>
@@ -266,13 +280,10 @@ export default function FirmwareManagement() {
                   onChange={(e) => handleFirmwareSelect(e.target.value)}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {availableFirmwares
-                    .filter(f => selectedPlatform === 'all' || f.platform === selectedPlatform)
-                    .map((firmware) => (
+                  {availableFirmwares.map((firmware) => (
                       <option key={firmware.key} value={firmware.key}>
-                        {firmware.platform === 'edge-go' ? '🟢' : firmware.platform === 'edge-pro' ? '🔵' : '⚪'} {firmware.name} 
+                        {firmware.name} 
                         {firmware.version && ` (v${firmware.version})`} • 
-                        {firmware.platform ? firmware.platform.toUpperCase() : 'N/A'} • 
                         {(firmware.size / 1024 / 1024).toFixed(2)} MB • 
                         {new Date(firmware.uploadedAt).toLocaleDateString('pt-BR')}
                       </option>
@@ -291,7 +302,7 @@ export default function FirmwareManagement() {
                 </label>
                 <select
                   value={selectedPlatform}
-                  onChange={(e) => setSelectedPlatform(e.target.value as Platform | 'all')}
+                  onChange={(e) => setSelectedPlatform(e.target.value as 'edge-go' | 'edge-pro' | 'all')}
                   className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">Selecione a plataforma</option>
@@ -364,11 +375,6 @@ export default function FirmwareManagement() {
               <div>
                 <h3 className="text-lg font-semibold text-green-900">
                   Firmware pronto: v{uploadedFirmware.version}
-                  {uploadedFirmware.platform && (
-                    <span className="ml-2 text-sm font-normal">
-                      ({uploadedFirmware.platform === 'edge-go' ? '🟢 Edge-Go' : '🔵 Edge-Pro'})
-                    </span>
-                  )}
                 </h3>
                 <p className="text-sm text-green-700 mt-1">
                   {(uploadedFirmware.size / 1024 / 1024).toFixed(2)} MB • 
@@ -399,7 +405,7 @@ export default function FirmwareManagement() {
             <div className="flex items-center gap-3">
               <select
                 value={selectedPlatform}
-                onChange={(e) => setSelectedPlatform(e.target.value as Platform | 'all')}
+                onChange={(e) => setSelectedPlatform(e.target.value as 'edge-go' | 'edge-pro' | 'all')}
                 className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">Todas as plataformas</option>
@@ -421,9 +427,7 @@ export default function FirmwareManagement() {
             <div className="text-center py-8 text-gray-500">Nenhum dispositivo conectado</div>
           ) : (
             <div className="space-y-3">
-              {devices
-                .filter(d => selectedPlatform === 'all' || d.platform === selectedPlatform)
-                .map((device) => {
+              {devices.map((device) => {
                 const isSelected = selectedDevices.has(device.deviceId);
                 const otaStatus = otaStatuses[device.deviceId];
 
@@ -449,7 +453,6 @@ export default function FirmwareManagement() {
                         <div>
                           <div className="flex items-center gap-3">
                             <h3 className="font-semibold text-gray-900">
-                              {device.platform === 'edge-go' ? '🟢' : device.platform === 'edge-pro' ? '🔵' : '⚪'} {' '}
                               {device.clientName && (
                                 <span className="text-gray-600 font-normal">
                                   {device.clientName}
@@ -458,18 +461,6 @@ export default function FirmwareManagement() {
                               )}
                               {device.name || device.deviceId}
                             </h3>
-                            <span
-                              className={`
-                                px-2 py-1 text-xs font-medium rounded-full
-                                ${device.platform === 'edge-go' 
-                                  ? 'bg-green-50 text-green-700 border border-green-200' 
-                                  : device.platform === 'edge-pro'
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                    : 'bg-gray-50 text-gray-700'}
-                              `}
-                            >
-                              {device.platform === 'edge-go' ? 'ESP32' : device.platform === 'edge-pro' ? 'Raspberry Pi' : 'N/A'}
-                            </span>
                             <span
                               className={`
                                 px-2 py-1 text-xs font-medium rounded-full

@@ -8,11 +8,8 @@ import {
   EnvelopeSimple, 
   MapPin,
   Calendar,
-  CalendarBlank,
   CreditCard,
   Wrench,
-  HeadsetIcon,
-  GraduationCap,
   Plus,
   PencilSimple,
   Trash,
@@ -20,21 +17,37 @@ import {
   Users,
   Envelope,
   FileText,
-  Receipt
+  Printer,
+  Copy,
+  IdentificationCard,
+  Package,
+  GearSix
 } from '@phosphor-icons/react';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { useClient, useActivateClient, useDeactivateClient, useDeleteClient } from '../../hooks/useClients';
+import { useClient, useActivateClient, useDeactivateClient, useDeleteClient, useUpdateClient } from '../../hooks/useClients';
+import { printersService } from '../../services/api';
 import { useContactsByClient, useCreateContact, useUpdateContact, useSetPrimaryContact, useToggleActiveContact, useDeleteContact } from '../../hooks/useContacts';
-import { useEquipmentByClient, useEquipmentStats, useCreateEquipment, useUpdateEquipment, useUpdateEquipmentStatus, useToggleActiveEquipment, useDeleteEquipment } from '../../hooks/useEquipment';
+import { useEquipmentByClient, useEquipmentStats, useUpdateEquipment } from '../../hooks/useEquipment';
+import { templatesService } from '../../services/templates';
 import { ContactForm } from '../../components/forms/ContactForm';
 import { EquipmentLoanForm } from '../../components/forms/EquipmentLoanForm';
 import { ClientUsersList } from '../../components/ClientUsersList';
+import { useOperationsByClient } from '../../hooks/useOperations';
+import { OperationFormModal } from '../../components/modals/OperationFormModal';
 import { SendInviteModal } from '../../components/modals/SendInviteModal';
-import ClientSubscriptions from '../../components/ClientSubscriptions';
-import type { ApiClient, ApiContact, CreateContactRequest, ApiEquipment, CreateEquipmentRequest } from '../../types/api';
+import { useOperatorsByClient } from '../../hooks/useOperators';
+import { OperatorFormModal } from '../../components/modals/OperatorFormModal';
+import { MaintenanceFormModal } from '../../components/modals/MaintenanceFormModal';
+import { ClientPlanManager } from '../../components/ClientPlanManager';
+import { PlanLimits } from '../../components/PlanLimits';
+import { EdgeGoAvailabilityChart } from '../../components/EdgeGoAvailabilityChart';
+import { LabelOrdersTab } from '../../components/LabelOrdersTab';
+import { LabelOrdersDashboard } from '../../components/LabelOrdersDashboard';
+import { useCreateMaintenance } from '../../hooks/useMaintenance';
+import type { ApiClient, ApiContact, CreateContactRequest, ApiEquipment } from '../../types/api';
 
-type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'subscriptions' | 'templates' | 'support' | 'training';
+type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'operations' | 'tagment' | 'operators' | 'plans' | 'label-orders';
 
 export function ClientDetails() {
   const navigate = useNavigate();
@@ -45,12 +58,31 @@ export function ClientDetails() {
   const [editingContact, setEditingContact] = useState<ApiContact | null>(null);
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<ApiEquipment | null>(null);
+  const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+  const [selectedEquipmentForMaintenance, setSelectedEquipmentForMaintenance] = useState<ApiEquipment | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showTagmentConfigModal, setShowTagmentConfigModal] = useState(false);
+  const [showTagmentSuccessModal, setShowTagmentSuccessModal] = useState(false);
+  const [showTagmentErrorModal, setShowTagmentErrorModal] = useState(false);
+  const [tagmentApiKey, setTagmentApiKey] = useState('');
+  const [isValidatingApiKey, setIsValidatingApiKey] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [tagmentConfig, setTagmentConfig] = useState<any>(null);
+  const [configurationResult, setConfigurationResult] = useState<any>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [tagmentPrinters, setTagmentPrinters] = useState<any[]>([]);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+  const [tagmentTemplates, setTagmentTemplates] = useState<any[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [defaultValidityTemplate, setDefaultValidityTemplate] = useState('');
+  const [logoUuid, setLogoUuid] = useState('');
+  const [granoboxPrinters, setGranoboxPrinters] = useState<any[]>([]);
+  const [isLoadingGranoboxPrinters, setIsLoadingGranoboxPrinters] = useState(false);
 
   // Função para obter a aba do hash da URL
   const getTabFromHash = (): TabType => {
     const hash = location.hash.replace('#', '');
-    const validTabs: TabType[] = ['overview', 'contacts', 'equipment', 'users', 'subscriptions', 'templates', 'support', 'training'];
+    const validTabs: TabType[] = ['overview', 'contacts', 'equipment', 'users', 'operations', 'tagment', 'operators', 'plans'];
     return validTabs.includes(hash as TabType) ? (hash as TabType) : 'overview';
   };
 
@@ -78,6 +110,124 @@ export function ClientDetails() {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  // Buscar cliente da API (declarado antes de efeitos que usam `client`)
+  const { data: client, isLoading, error } = useClient(id!);
+
+  // Buscar operadores para exibir contagem
+  const { data: operatorsForStats = [] } = useOperatorsByClient(id!);
+
+  // Carregar configuração Tagment salva
+  useEffect(() => {
+    if (id) {
+      const savedConfig = localStorage.getItem(`tagment_config_${id}`);
+      if (savedConfig) {
+        try {
+          setTagmentConfig(JSON.parse(savedConfig));
+        } catch (error) {
+          console.error('Erro ao carregar configuração Tagment:', error);
+        }
+      }
+    }
+  }, [id]);
+
+  // Funções auxiliares para carregamento automático
+  const loadTagmentTemplates = async (apiKey: string) => {
+    setIsLoadingTemplates(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_TAGMENT_API_URL || 'https://api.tagment.com.br'}/v1/templates`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const templates = await response.json();
+        setTagmentTemplates(templates);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar templates:', error);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  const loadTagmentPrinters = async (apiKey: string) => {
+    setIsLoadingPrinters(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_TAGMENT_API_URL || 'https://api.tagment.com.br'}/v1/printers`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const printers = await response.json();
+        setTagmentPrinters(printers);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar impressoras:', error);
+    } finally {
+      setIsLoadingPrinters(false);
+    }
+  };
+
+  // Carregar dados do Tagment automaticamente quando configuração estiver disponível
+  useEffect(() => {
+    if (tagmentConfig?.apiKey && activeTab === 'tagment') {
+      // Carregar templates e impressoras automaticamente
+      loadTagmentTemplates(tagmentConfig.apiKey);
+      loadTagmentPrinters(tagmentConfig.apiKey);
+    }
+  }, [tagmentConfig, activeTab]);
+
+  // Carregar impressoras do Granobox quando estiver na aba tagment
+  useEffect(() => {
+    if (activeTab === 'tagment' && id) {
+      loadGranoboxPrinters();
+    }
+  }, [activeTab, id]);
+
+  // Carregar template padrão de validade quando estiver na aba tagment
+  useEffect(() => {
+    const loadDefaultTemplate = async () => {
+    if (activeTab === 'tagment' && id) {
+        try {
+          const association = await templatesService.getDefaultTemplate(id, 'etiqueta_validade');
+          if (association?.templateId) {
+            setDefaultValidityTemplate(association.templateId);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar template padrão:', error);
+    }
+      }
+    };
+    loadDefaultTemplate();
+  }, [activeTab, id]);
+
+  // Carregar logo do cliente quando estiver na aba tagment
+  useEffect(() => {
+    if (activeTab === 'tagment' && client?.tagmentLogoUuid) {
+      setLogoUuid(client.tagmentLogoUuid);
+    }
+  }, [activeTab, client?.tagmentLogoUuid]);
+
+  // Popular configuração Tagment a partir do cliente carregado
+  useEffect(() => {
+    if (client?.tagmentApiKey) {
+      const customerId = client.businessName
+        ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}`
+        : (id ? `gbx_client_${id}` : '');
+      setTagmentConfig({
+        customerId,
+        apiKey: client.tagmentApiKey,
+        isActive: true,
+        configuredAt: client.updatedAt || new Date().toISOString(),
+      });
+    }
+  }, [client, id]);
+
   // Função para navegar para uma aba específica de forma programática
   const navigateToTab = (tab: TabType) => {
     handleTabChange(tab);
@@ -88,11 +238,10 @@ export function ClientDetails() {
     }
   };
 
-  // Buscar cliente da API
-  const { data: client, isLoading, error } = useClient(id!);
   const activateClientMutation = useActivateClient();
   const deactivateClientMutation = useDeactivateClient();
   const deleteClientMutation = useDeleteClient();
+  const updateClientMutation = useUpdateClient();
 
   // Hooks para contatos
   const { data: contacts = [], isLoading: contactsLoading } = useContactsByClient(id!);
@@ -105,11 +254,10 @@ export function ClientDetails() {
   // Hooks para equipamentos
   const { data: equipment = [], isLoading: equipmentLoading } = useEquipmentByClient(id!);
   const { data: equipmentStats } = useEquipmentStats(id!);
-  const createEquipmentMutation = useCreateEquipment();
   const updateEquipmentMutation = useUpdateEquipment();
-  // const updateEquipmentStatusMutation = useUpdateEquipmentStatus();
-  // const toggleActiveEquipmentMutation = useToggleActiveEquipment();
-  const deleteEquipmentMutation = useDeleteEquipment();
+  
+  // Hook para manutenções
+  const createMaintenanceMutation = useCreateMaintenance();
 
   // Funções de formatação
   const formatCpf = (cpf: string) => {
@@ -188,6 +336,21 @@ export function ClientDetails() {
     }
   };
 
+  useEffect(() => {
+    setLogoUuid((client as any)?.tagmentLogoUuid || '');
+  }, [client?.tagmentLogoUuid]);
+
+  const handleSaveLogoUuid = async () => {
+    if (!id) return;
+    try {
+      await updateClientMutation.mutateAsync({ id, data: { tagmentLogoUuid: logoUuid.trim() } });
+      alert('UUID do logo salvo com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar UUID do logo:', error);
+      alert('Erro ao salvar UUID do logo. Tente novamente.');
+    }
+  };
+
   const handleEditContact = (contact: ApiContact) => {
     setEditingContact(contact);
     setShowContactForm(true);
@@ -213,9 +376,12 @@ export function ClientDetails() {
           status: 'active', // Equipamento fica ativo quando emprestado
         },
       });
+      
       setShowEquipmentForm(false);
-    } catch (error) {
+      alert('Equipamento associado com sucesso!');
+    } catch (error: any) {
       console.error('Erro ao associar equipamento:', error);
+      alert(`Erro ao associar equipamento: ${error.response?.data?.message || error.message || 'Erro desconhecido'}`);
     }
   };
 
@@ -298,6 +464,176 @@ export function ClientDetails() {
   const handleCancelEquipmentForm = () => {
     setShowEquipmentForm(false);
     setEditingEquipment(null);
+  };
+
+  // Funções para gerenciar manutenções
+  const handleOpenMaintenanceModal = (equipment: ApiEquipment) => {
+    setSelectedEquipmentForMaintenance(equipment);
+    setShowMaintenanceModal(true);
+  };
+
+  const handleCreateMaintenance = async (data: any) => {
+    try {
+      await createMaintenanceMutation.mutateAsync(data);
+      setShowMaintenanceModal(false);
+      setSelectedEquipmentForMaintenance(null);
+      alert('Manutenção registrada com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao registrar manutenção:', error);
+      alert(`Erro ao registrar manutenção: ${error.response?.data?.message || error.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  // Função para copiar API Key
+  const handleCopyApiKey = async () => {
+    if (!tagmentConfig?.apiKey) return;
+    
+    try {
+      await navigator.clipboard.writeText(tagmentConfig.apiKey);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Erro ao copiar API Key:', err);
+      // Fallback para navegadores mais antigos
+      const textArea = document.createElement('textarea');
+      textArea.value = tagmentConfig.apiKey;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  };
+
+  // Funções para Tagment
+  const handleConfigureTagmentApiKey = async () => {
+    if (!tagmentApiKey.trim()) {
+      setErrorMessage('Por favor, insira uma API Key válida');
+      setShowTagmentErrorModal(true);
+      return;
+    }
+
+    // Validação básica de formato
+    if (!tagmentApiKey.startsWith('tgm_') || tagmentApiKey.length < 10) {
+      setErrorMessage('Formato de API Key inválido. Deve começar com "tgm_" e ter pelo menos 10 caracteres.');
+      setShowTagmentErrorModal(true);
+      return;
+    }
+
+    setIsValidatingApiKey(true);
+    
+    try {
+      // Persistir no backend (clients.update) para que apps consumam via API
+      const customerId = client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : `gbx_client_${id}`;
+      if (!id) throw new Error('ID do cliente não encontrado');
+      await updateClientMutation.mutateAsync({
+        id: id as string,
+        // types não expõem tagmentCustomerId; usar any para enviar ambos
+        data: { tagmentApiKey: tagmentApiKey.trim(), tagmentCustomerId: customerId } as any,
+      });
+
+      // Atualizar estado local / exibir sucesso
+      const newConfig = {
+        customerId,
+        apiKey: tagmentApiKey.trim(),
+        isActive: true,
+        configuredAt: new Date().toISOString(),
+      };
+      setTagmentConfig(newConfig);
+      setConfigurationResult(newConfig);
+
+      setShowTagmentConfigModal(false);
+      setShowTagmentSuccessModal(true);
+      setTagmentApiKey('');
+
+      if (activeTab === 'tagment') {
+        loadTagmentTemplates(newConfig.apiKey);
+        loadTagmentPrinters(newConfig.apiKey);
+      }
+      
+    } catch (error) {
+      console.error('Erro ao configurar API Key:', error);
+      setErrorMessage('Erro inesperado ao configurar API Key. Tente novamente.');
+      setShowTagmentErrorModal(true);
+    } finally {
+      setIsValidatingApiKey(false);
+    }
+  };
+
+  const handleListTagmentPrinters = async () => {
+    if (!tagmentConfig?.apiKey) {
+      setErrorMessage('API Key não configurada');
+      setShowTagmentErrorModal(true);
+      return;
+    }
+
+    try {
+      await loadTagmentPrinters(tagmentConfig.apiKey);
+    } catch (error) {
+      setErrorMessage(`Erro ao conectar com Tagment: ${(error as Error).message}`);
+      setShowTagmentErrorModal(true);
+    }
+  };
+
+  const handleSyncTagmentTemplates = async () => {
+    if (!tagmentConfig?.apiKey) {
+      setErrorMessage('API Key não configurada');
+      setShowTagmentErrorModal(true);
+      return;
+    }
+
+    try {
+      await loadTagmentTemplates(tagmentConfig.apiKey);
+    } catch (error) {
+      setErrorMessage(`Erro ao sincronizar templates: ${(error as Error).message}`);
+      setShowTagmentErrorModal(true);
+    }
+  };
+
+  const handleSaveDefaultTemplate = async () => {
+    if (!id || !defaultValidityTemplate.trim()) return;
+    
+    try {
+      // Chamar API para salvar template padrão de validade
+      await templatesService.setDefaultTemplate(id, 'etiqueta_validade', defaultValidityTemplate.trim());
+      
+      alert('Template padrão de validade salvo com sucesso!');
+    } catch (error) {
+      console.error('Erro ao salvar template padrão:', error);
+      alert('Erro ao salvar template padrão. Tente novamente.');
+    }
+  };
+
+  // Carregar impressoras do Granobox
+  const loadGranoboxPrinters = async () => {
+    if (!id) return;
+    
+    setIsLoadingGranoboxPrinters(true);
+    try {
+      const printers = await printersService.getAll(id);
+      setGranoboxPrinters(printers);
+    } catch (error) {
+      console.error('Erro ao carregar impressoras do Granobox:', error);
+    } finally {
+      setIsLoadingGranoboxPrinters(false);
+    }
+  };
+
+  // Definir impressora como padrão para um tipo de uso
+  const handleSetAsDefault = async (_printerId: string, usage: 'validity' | 'label') => {
+    if (!id) return;
+    
+    try {
+      // TODO: Implementar endpoint setAsDefault no backend
+      // await printersService.setAsDefault(_printerId, usage);
+      // Recarregar lista de impressoras para atualizar o estado
+      await loadGranoboxPrinters();
+      alert(`Funcionalidade em desenvolvimento. Impressora padrão para ${usage === 'validity' ? 'validade' : 'rótulo'}`);
+    } catch (error: any) {
+      console.error('Erro ao definir impressora como padrão:', error);
+      alert(`Erro ao definir impressora como padrão: ${error.response?.data?.message || error.message || 'Erro desconhecido'}`);
+    }
   };
 
   // Estados de loading e erro
@@ -399,13 +735,14 @@ export function ClientDetails() {
 
   const tabs = [
     { id: 'overview', label: 'Visão Geral', icon: User },
+    { id: 'plans', label: 'Planos', icon: Package },
     { id: 'contacts', label: 'Contatos', icon: EnvelopeSimple },
     { id: 'equipment', label: 'Equipamentos', icon: Wrench },
     { id: 'users', label: 'Usuários', icon: Users },
-    { id: 'subscriptions', label: 'Assinaturas', icon: Receipt },
-    { id: 'templates', label: 'Templates', icon: FileText },
-    { id: 'support', label: 'Suporte', icon: HeadsetIcon },
-    { id: 'training', label: 'Treinamentos', icon: GraduationCap },
+    { id: 'operations', label: 'Operações', icon: Wrench },
+    { id: 'operators', label: 'Operadores', icon: IdentificationCard },
+    { id: 'tagment', label: 'Tagment', icon: Printer },
+    { id: 'label-orders', label: 'Pedidos de Etiquetas', icon: Package },
   ];
 
   return (
@@ -558,33 +895,16 @@ export function ClientDetails() {
 
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigateToTab('support')}
+          onClick={() => navigateToTab('operators')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Tickets Suporte</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
+                <p className="text-sm font-medium text-gray-600">Operadores</p>
+                <p className="text-2xl font-bold text-gray-900">{operatorsForStats.length}</p>
               </div>
               <div className="p-3 bg-gray-100 rounded-full">
-                <HeadsetIcon size={20} className="text-gray-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigateToTab('training')}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Treinamentos</p>
-                <p className="text-2xl font-bold text-gray-900">0</p>
-              </div>
-              <div className="p-3 bg-gray-100 rounded-full">
-                <GraduationCap size={20} className="text-gray-600" />
+                <IdentificationCard size={20} className="text-gray-600" />
               </div>
             </div>
           </CardContent>
@@ -612,6 +932,10 @@ export function ClientDetails() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'plans' && client && (
+        <ClientPlanManager clientId={client.id} />
+      )}
+
       {activeTab === 'overview' && (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Informações Básicas */}
@@ -679,7 +1003,7 @@ export function ClientDetails() {
                   <p className="text-sm text-gray-600">Data de Ativação</p>
                   <p className="font-medium">
                     {client.activatedAt 
-                      ? new Date(client.activatedAt).toLocaleDateString('pt-BR') 
+                      ? new Date(client.activatedAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) 
                       : 'Não ativado'
                     }
                   </p>
@@ -713,11 +1037,20 @@ export function ClientDetails() {
               <div>
                 <p className="text-sm text-gray-600">Cliente desde</p>
                 <p className="font-medium">
-                  {new Date(client.createdAt).toLocaleDateString('pt-BR')}
+                  {new Date(client.createdAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                 </p>
               </div>
             </CardContent>
           </Card>
+
+          {/* Uso e Limites do Plano */}
+          <PlanLimits clientId={client.id} />
+
+          {/* Gráfico de Disponibilidade Edge-Go */}
+          <EdgeGoAvailabilityChart clientId={client.id} />
+
+          {/* Pedidos de Etiquetas - Dashboard */}
+          <LabelOrdersDashboard clientId={client.id} />
 
           {/* Observações */}
           {client.notes && (
@@ -916,7 +1249,7 @@ export function ClientDetails() {
               <CardContent>
                 <EquipmentLoanForm
                   clientId={id!}
-                  initialData={editingEquipment}
+                  initialData={editingEquipment || undefined}
                   onSubmit={editingEquipment ? handleUpdateEquipmentLoan : handleCreateEquipmentLoan}
                   onCancel={handleCancelEquipmentForm}
                   isSubmitting={updateEquipmentMutation.isPending}
@@ -1035,12 +1368,12 @@ export function ClientDetails() {
                             )}
                           </div>
                           <div>
-                            <p><strong>Início do Comodato:</strong> {new Date(item.loanStartDate).toLocaleDateString('pt-BR')}</p>
+                            <p><strong>Início do Comodato:</strong> {new Date(item.loanStartDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                             {item.loanEndDate && (
-                              <p><strong>Fim Previsto:</strong> {new Date(item.loanEndDate).toLocaleDateString('pt-BR')}</p>
+                              <p><strong>Fim Previsto:</strong> {new Date(item.loanEndDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                             )}
                             {item.returnDate && (
-                              <p><strong>Data de Devolução:</strong> {new Date(item.returnDate).toLocaleDateString('pt-BR')}</p>
+                              <p><strong>Data de Devolução:</strong> {new Date(item.returnDate).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
                             )}
                             {item.location && (
                               <p><strong>Localização:</strong> {item.location}</p>
@@ -1056,6 +1389,16 @@ export function ClientDetails() {
                       </div>
 
                       <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleOpenMaintenanceModal(item)}
+                          title="Registrar manutenção"
+                          className="text-orange-600 hover:text-orange-700 border-orange-200 hover:border-orange-300"
+                        >
+                          <GearSix size={14} />
+                        </Button>
+                        
                         <Button
                           size="sm"
                           variant="outline"
@@ -1115,105 +1458,598 @@ export function ClientDetails() {
         </div>
       )}
 
-      {activeTab === 'subscriptions' && (
-        <ClientSubscriptions clientId={id!} />
+  {activeTab === 'operations' && (
+    <OperationsTab clientId={id!} />
+  )}
+
+      {activeTab === 'operators' && (
+        <OperatorsTab clientId={id!} />
       )}
 
-      {activeTab === 'templates' && (
+      {activeTab === 'label-orders' && id && (
+        <LabelOrdersTab clientId={id} />
+      )}
+
+      {activeTab === 'tagment' && (
         <div className="space-y-6">
+          {/* Configuração da API Key */}
           <Card>
             <CardHeader>
-              <CardTitle>Associações de Templates</CardTitle>
+              <CardTitle>Configuração da API</CardTitle>
               <p className="text-sm text-gray-600">
-                Configure quais templates usar para cada tipo de etiqueta deste cliente
+                Configure a integração com a API Tagment para impressão de etiquetas
               </p>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <FileText size={48} className="mx-auto text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  Gerenciar Templates
-                </h3>
-                <p className="text-gray-600 mb-4">
-                  Configure as associações de templates para este cliente
-                </p>
-                <Button onClick={() => navigate(`/templates/associations/${id}`)}>
-                  <FileText size={16} className="mr-2" />
-                  Gerenciar Templates
-                </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Status da Integração */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-900">Status da Integração</h4>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${tagmentConfig ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                    <span className="text-sm text-gray-600">
+                      {tagmentConfig ? 'Configurado' : 'Não configurado'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <p>• Customer ID: {tagmentConfig?.customerId || (client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : 'Não definido')}</p>
+                    <div className="flex items-center gap-2">
+                      <p>• API Key: {tagmentConfig ? `${tagmentConfig.apiKey.substring(0, 10)}...` : 'Não configurada'}</p>
+                      {tagmentConfig && (
+                        <button
+                          onClick={handleCopyApiKey}
+                          className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                          title="Copiar API Key completa"
+                        >
+                          <Copy size={12} />
+                          {copySuccess ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      )}
+                    </div>
+                    <p>• Status: {tagmentConfig ? 'Conectado' : 'Desconectado'}</p>
+                    <p>• Templates: {tagmentTemplates.length} disponível(is)</p>
+                    <p>• Impressoras: {tagmentPrinters.length} conectada(s)</p>
+                    {tagmentConfig && (
+                      <p>• Configurado em: {new Date(tagmentConfig.configuredAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Configuração */}
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-900">Configuração</h4>
+                  <div className="space-y-2">
+                    <Button 
+                      onClick={() => setShowTagmentConfigModal(true)}
+                      className="w-full"
+                    >
+                      <Wrench size={16} className="mr-2" />
+                      Configurar API Key
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        if (tagmentConfig) {
+                          alert(`Testando conexão com Tagment...\n\nCustomer ID: ${tagmentConfig.customerId}\nAPI Key: ${tagmentConfig.apiKey.substring(0, 10)}...`);
+                        }
+                      }}
+                      className="w-full"
+                      disabled={!tagmentConfig}
+                    >
+                      <Printer size={16} className="mr-2" />
+                      Testar Conexão
+                    </Button>
+                  </div>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Templates Tagment */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Templates de Impressão</CardTitle>
+              <p className="text-sm text-gray-600">
+                Templates Tagment associados para cada tipo de etiqueta
+              </p>
+            </CardHeader>
+            <CardContent>
+              {/* Configuração do Template Padrão de Validade */}
+              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-medium text-green-900 mb-3">Template Padrão de Validade</h4>
+                <p className="text-sm text-green-800 mb-4">
+                  Configure o template padrão que será usado para etiquetas de validade quando o produto não tiver template customizado.
+                </p>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-green-900 mb-1">
+                      UUID do Template
+                    </label>
+                    <input
+                      type="text"
+                      value={defaultValidityTemplate}
+                      onChange={(e) => setDefaultValidityTemplate(e.target.value)}
+                      placeholder="Cole aqui o UUID do template de validade"
+                      className="w-full px-3 py-2 border border-green-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={handleSaveDefaultTemplate}
+                      disabled={!defaultValidityTemplate.trim()}
+                      className="px-4 py-2"
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              {defaultValidityTemplate && (
+                  <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-800">
+                    <strong>Preview:</strong> {defaultValidityTemplate}
+                  </div>
+                )}
+              <div className="mt-6">
+                <h5 className="font-medium text-green-900 mb-2">Logo do Cliente</h5>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-green-900 mb-1">
+                      UUID do Logo
+                    </label>
+                    <input
+                      type="text"
+                      value={logoUuid}
+                      onChange={(e) => setLogoUuid(e.target.value)}
+                      placeholder="Cole aqui o UUID do logo do cliente"
+                      className="w-full px-3 py-2 border border-green-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={handleSaveLogoUuid}
+                      disabled={!logoUuid.trim() || updateClientMutation.isPending}
+                      className="px-4 py-2"
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              </div>
+
+              {isLoadingTemplates ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Sincronizando templates...</p>
+                </div>
+              ) : tagmentTemplates.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">
+                      {tagmentTemplates.length} template(s) disponível(is)
+                    </span>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSyncTagmentTemplates}
+                    >
+                      Atualizar
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {tagmentTemplates.map((template) => (
+                      <div 
+                        key={template.id} 
+                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{template.name}</h4>
+                            <p className="text-sm text-gray-600">{template.description}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              ID: {template.id}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              {template.type || 'Template'}
+                            </span>
+                            {template.size && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                {template.size.w}x{template.size.h} {template.size.unit}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText size={48} className="mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    {tagmentConfig ? 'Nenhum Template Encontrado' : 'Configure a API Key'}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {tagmentConfig ? 
+                      'Nenhum template foi encontrado na sua conta Tagment' : 
+                      'Configure a API Key primeiro para carregar os templates disponíveis'
+                    }
+                  </p>
+                  <Button 
+                    onClick={handleSyncTagmentTemplates}
+                    disabled={!tagmentConfig || isLoadingTemplates}
+                    className={!tagmentConfig ? "opacity-50" : ""}
+                  >
+                    <FileText size={16} className="mr-2" />
+                    {isLoadingTemplates ? 'Sincronizando...' : 'Sincronizar Templates'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Impressoras Tagment */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Impressoras Conectadas</CardTitle>
+              <p className="text-sm text-gray-600">
+                Impressoras gerenciadas pelo Print Agent via Tagment
+              </p>
+            </CardHeader>
+            <CardContent>
+              {isLoadingPrinters ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Carregando impressoras...</p>
+                </div>
+              ) : tagmentPrinters.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">
+                      {tagmentPrinters.length} impressora(s) encontrada(s)
+                    </span>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={handleListTagmentPrinters}
+                    >
+                      Atualizar
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {tagmentPrinters.map((printer) => (
+                      <div 
+                        key={printer.id} 
+                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className={`w-3 h-3 rounded-full ${
+                              printer.status === 'online' ? 'bg-green-500' : 
+                              printer.status === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
+                            }`}></div>
+                            <div>
+                              <h4 className="font-medium text-gray-900">{printer.displayName}</h4>
+                              <p className="text-sm text-gray-600">
+                                {printer.externalLocationId && `Local: ${printer.externalLocationId} • `}
+                                Status: {printer.status}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-gray-500">
+                            <p>Hoje: {printer.printsToday || 0}</p>
+                            <p>Total: {printer.totalPrints || 0}</p>
+                          </div>
+                        </div>
+                        
+                        {printer.lastSeenAt && (
+                          <p className="text-xs text-gray-400 mt-2">
+                            Última atividade: {(() => {
+                              const dateStr = printer.lastSeenAt.toString();
+                              const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
+                              return date.toLocaleString('pt-BR', { 
+                                timeZone: 'America/Sao_Paulo',
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                              });
+                            })()}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Printer size={48} className="mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    {tagmentConfig ? 'Nenhuma Impressora Conectada' : 'Configure a API Key'}
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    {tagmentConfig ? 
+                      'Nenhuma impressora foi encontrada para este cliente' : 
+                      'Configure a API Key e Print Agent para ver as impressoras'
+                    }
+                  </p>
+                  <Button 
+                    onClick={handleListTagmentPrinters}
+                    disabled={!tagmentConfig || isLoadingPrinters}
+                    className={!tagmentConfig ? "opacity-50" : ""}
+                  >
+                    <Printer size={16} className="mr-2" />
+                    {isLoadingPrinters ? 'Carregando...' : 'Listar Impressoras'}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Impressoras Granobox (Edge-Go) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Impressoras Granobox</CardTitle>
+              <p className="text-sm text-gray-600">
+                Impressoras configuradas no Granobox (Edge-Go e TCP)
+              </p>
+            </CardHeader>
+            <CardContent>
+              {isLoadingGranoboxPrinters ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Carregando impressoras...</p>
+                </div>
+              ) : granoboxPrinters.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">
+                      {granoboxPrinters.length} impressora(s) configurada(s)
+                    </span>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={loadGranoboxPrinters}
+                    >
+                      Atualizar
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {granoboxPrinters.map((printer) => {
+                      const hasValidity = printer.usage?.includes('validity');
+                      const hasLabel = printer.usage?.includes('label');
+                      // Nota: A API atualmente define isDefault como booleano simples
+                      // Uma impressora pode ser padrão para um tipo de uso específico
+                      // Por enquanto, verificamos se é padrão E tem o tipo de uso
+                      const isDefaultValidity = printer.isDefault && hasValidity;
+                      const isDefaultLabel = printer.isDefault && hasLabel;
+                      
+                      return (
+                        <div 
+                          key={printer.id} 
+                          className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-3 h-3 rounded-full ${
+                                printer.status === 'active' ? 'bg-green-500' : 
+                                printer.status === 'inactive' ? 'bg-red-500' : 'bg-yellow-500'
+                              }`}></div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-gray-900">{printer.name || printer.deviceId}</h4>
+                                  {printer.isDefault && (
+                                    <span className="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
+                                      Padrão
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600">
+                                  {printer.deviceId && `Edge-Go: ${printer.deviceId} • `}
+                                  {printer.ip && `IP: ${printer.ip}:${printer.port} • `}
+                                  Tipo: {printer.type} • Status: {printer.status}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Uso: {printer.usage?.join(', ') || 'N/A'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-3 flex gap-2">
+                            {hasValidity && (
+                              <Button
+                                size="sm"
+                                variant={isDefaultValidity ? "default" : "outline"}
+                                onClick={() => handleSetAsDefault(printer.id, 'validity')}
+                                className={isDefaultValidity ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              >
+                                {isDefaultValidity ? '✓ Padrão Validade' : 'Definir Padrão Validade'}
+                              </Button>
+                            )}
+                            {hasLabel && (
+                              <Button
+                                size="sm"
+                                variant={isDefaultLabel ? "default" : "outline"}
+                                onClick={() => handleSetAsDefault(printer.id, 'label')}
+                                className={isDefaultLabel ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              >
+                                {isDefaultLabel ? '✓ Padrão Rótulo' : 'Definir Padrão Rótulo'}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Printer size={48} className="mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Nenhuma Impressora Configurada
+                  </h3>
+                  <p className="text-gray-600 mb-4">
+                    Configure impressoras Edge-Go ou TCP no sistema
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
       )}
 
-      {activeTab === 'support' && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Histórico de Suporte</CardTitle>
-            <Button size="sm" onClick={() => navigate('/support/new')}>
-              <Plus size={16} className="mr-2" />
-              Novo Ticket
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <HeadsetIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Nenhum ticket de suporte
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Este cliente ainda não possui tickets de suporte registrados.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 text-left mb-4">
-                <h4 className="font-medium text-gray-900 mb-2">Tipos de suporte disponíveis:</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Suporte técnico (configuração, problemas)</li>
-                  <li>• Dúvidas sobre o sistema</li>
-                  <li>• Solicitações de treinamento</li>
-                  <li>• Problemas com equipamentos</li>
-                </ul>
+
+      {/* Modal de configuração Tagment */}
+      {showTagmentConfigModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Configurar API Key Tagment</h2>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  API Key Tagment
+                </label>
+                <input
+                  type="text"
+                  value={tagmentApiKey}
+                  onChange={(e) => setTagmentApiKey(e.target.value)}
+                  placeholder="tgm_..."
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Formato: tgm_ seguido de 64 caracteres
+                </p>
               </div>
-              <Button onClick={() => navigate('/support/new')}>
-                <Plus size={16} className="mr-2" />
-                Criar Primeiro Ticket
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <h4 className="text-sm font-medium text-blue-900 mb-1">Customer ID</h4>
+                <p className="text-sm text-blue-700">
+                  {client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : `gbx_client_${id}`}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Este será o ID usado no Tagment para identificar o cliente
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-4 pt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowTagmentConfigModal(false);
+                  setTagmentApiKey('');
+                }}
+                disabled={isValidatingApiKey}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleConfigureTagmentApiKey}
+                disabled={isValidatingApiKey || !tagmentApiKey.trim()}
+              >
+                {isValidatingApiKey ? 'Validando...' : 'Configurar'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
-      {activeTab === 'training' && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Histórico de Treinamentos</CardTitle>
-            <Button size="sm" disabled>
-              <Plus size={16} className="mr-2" />
-              Agendar Treinamento
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-8">
-              <GraduationCap className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Módulo em Desenvolvimento
-              </h3>
-              <p className="text-gray-500 mb-4">
-                O sistema de agendamento de treinamentos estará disponível em breve.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 text-left">
-                <h4 className="font-medium text-gray-900 mb-2">Tipos de treinamento planejados:</h4>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Treinamento inicial (onboarding)</li>
-                  <li>• Treinamento avançado de funcionalidades</li>
-                  <li>• Treinamento para novos funcionários</li>
-                  <li>• Workshops de melhores práticas</li>
-                  <li>• Suporte técnico especializado</li>
-                </ul>
+      {/* Modal de sucesso Tagment */}
+      {showTagmentSuccessModal && configurationResult && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
+              
+              <h2 className="text-xl font-semibold mb-2 text-gray-900">
+                API Key Configurada!
+              </h2>
+              
+              <p className="text-gray-600 mb-6">
+                A integração com Tagment foi configurada com sucesso.
+              </p>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 text-left mb-6">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Detalhes da Configuração:</h4>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Customer ID:</strong> {configurationResult.customerId}</p>
+                  <p><strong>API Key:</strong> {configurationResult.apiKey.substring(0, 10)}...</p>
+                  <p><strong>Status:</strong> Ativo</p>
+                  <p><strong>Configurado em:</strong> {new Date(configurationResult.configuredAt).toLocaleString('pt-BR')}</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
+                <p className="text-sm text-blue-800">
+                  <strong>Próximos passos:</strong> Agora você pode sincronizar templates e listar impressoras conectadas.
+                </p>
+              </div>
+
+              <Button 
+                onClick={() => {
+                  setShowTagmentSuccessModal(false);
+                  setConfigurationResult(null);
+                }}
+                className="w-full"
+              >
+                Entendi
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de erro Tagment */}
+      {showTagmentErrorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              
+              <h2 className="text-xl font-semibold mb-2 text-gray-900">
+                Erro na Configuração
+              </h2>
+              
+              <p className="text-gray-600 mb-6">
+                {errorMessage}
+              </p>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-6">
+                <p className="text-sm text-yellow-800">
+                  <strong>Dica:</strong> Verifique se a API Key está no formato correto: tgm_seguido_de_64_caracteres
+                </p>
+              </div>
+
+              <Button 
+                onClick={() => {
+                  setShowTagmentErrorModal(false);
+                  setErrorMessage('');
+                }}
+                variant="outline"
+                className="w-full"
+              >
+                Tentar Novamente
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal de convite */}
@@ -1223,6 +2059,174 @@ export function ClientDetails() {
         clientId={id!}
         clientName={client?.businessName || client?.fullName || 'Cliente'}
       />
+
+      {/* Modal de manutenção */}
+      <MaintenanceFormModal
+        isOpen={showMaintenanceModal}
+        onClose={() => {
+          setShowMaintenanceModal(false);
+          setSelectedEquipmentForMaintenance(null);
+        }}
+        onSubmit={handleCreateMaintenance}
+        equipment={selectedEquipmentForMaintenance || undefined}
+        isSubmitting={createMaintenanceMutation.isPending}
+      />
     </div>
   );
 }
+
+function OperationsTab({ clientId }: { clientId: string }) {
+  const { data: operations = [], isLoading, error } = useOperationsByClient(clientId);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold">Operações do Cliente</h3>
+        <Button onClick={() => { setEditing(null); setOpen(true); }}>
+          <Plus size={16} className="mr-2" />
+          Nova Operação
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-8 text-gray-500">Carregando operações...</div>
+      ) : error ? (
+        <div className="text-center py-8 text-red-600">Erro ao carregar operações</div>
+      ) : operations.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">Nenhuma operação cadastrada</div>
+      ) : (
+        <div className="space-y-3">
+          {operations.map((op) => (
+            <div key={op.id} className="border rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <div className="font-medium text-gray-900">{op.name} <span className="text-sm text-gray-500">({op.type})</span></div>
+                {op.description && <div className="text-sm text-gray-600">{op.description}</div>}
+                <div className="text-xs text-gray-500 mt-1">Status: {op.status}</div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => { setEditing(op); setOpen(true); }}>Editar</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <OperationFormModal isOpen={open} onClose={() => setOpen(false)} clientId={clientId} initial={editing} />
+    </div>
+  );
+}
+
+function OperatorsTab({ clientId }: { clientId: string }) {
+  const { data: operators = [], isLoading, error } = useOperatorsByClient(clientId);
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+
+  const getAccessLevelLabel = (level: string) => {
+    switch (level) {
+      case 'basic':
+        return 'Básico';
+      case 'intermediate':
+        return 'Intermediário';
+      case 'advanced':
+        return 'Avançado';
+      default:
+        return level;
+    }
+  };
+
+  const getAccessLevelColor = (level: string) => {
+    switch (level) {
+      case 'basic':
+        return 'bg-gray-100 text-gray-700';
+      case 'intermediate':
+        return 'bg-blue-100 text-blue-700';
+      case 'advanced':
+        return 'bg-purple-100 text-purple-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle>Operadores do Cliente</CardTitle>
+            <Button onClick={() => { setEditing(null); setOpen(true); }}>
+              <Plus size={16} className="mr-2" />
+              Novo Operador
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="text-center py-8 text-gray-500">Carregando operadores...</div>
+          ) : error ? (
+            <div className="text-center py-8 text-red-600">Erro ao carregar operadores</div>
+          ) : operators.length === 0 ? (
+            <div className="text-center py-12">
+              <IdentificationCard size={48} className="mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium mb-2 text-gray-900">Nenhum operador cadastrado</h3>
+              <p className="text-gray-500 mb-4">Adicione operadores para permitir o uso do sistema pelo cliente.</p>
+              <Button onClick={() => { setEditing(null); setOpen(true); }}>
+                <Plus size={16} className="mr-2" />
+                Adicionar Primeiro Operador
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {operators.map((operator) => (
+                <div 
+                  key={operator.id} 
+                  className={`border rounded-lg p-4 flex items-center justify-between ${
+                    operator.isActive ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-200 opacity-60'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-medium text-gray-900">{operator.name}</h4>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getAccessLevelColor(operator.accessLevel)}`}>
+                        {getAccessLevelLabel(operator.accessLevel)}
+                      </span>
+                      {!operator.isActive && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                          Inativo
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="text-sm text-gray-600">
+                      <p><strong>PIN:</strong> ••••</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setEditing(operator); setOpen(true); }}
+                      title="Editar operador"
+                    >
+                      <PencilSimple size={14} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <OperatorFormModal 
+        isOpen={open} 
+        onClose={() => { setOpen(false); setEditing(null); }} 
+        clientId={clientId} 
+        initial={editing} 
+      />
+    </div>
+  );
+}
+
