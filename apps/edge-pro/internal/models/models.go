@@ -184,4 +184,17 @@ type PrintJobResult struct {
 	Message   string    `json:"message,omitempty"`
 	PrintedAt time.Time `json:"printedAt,omitempty"`
 	Error     string    `json:"error,omitempty"`
+	// ⭐ Status detalhado da impressora
+	PrinterStatus *PrinterStatusResult `json:"printerStatus,omitempty"`
+}
+
+// PrinterStatusResult status detalhado da impressora para enviar via WebSocket
+type PrinterStatusResult struct {
+	OK           bool   `json:"ok"`
+	ErrorCode    string `json:"errorCode,omitempty"`    // PAPER_OUT, RIBBON_OUT, HEAD_OPEN, etc.
+	ErrorMessage string `json:"errorMessage,omitempty"` // Mensagem legível
+	PaperOut     bool   `json:"paperOut,omitempty"`
+	RibbonOut    bool   `json:"ribbonOut,omitempty"`
+	HeadOpen     bool   `json:"headOpen,omitempty"`
+	Paused       bool   `json:"paused,omitempty"`
 }

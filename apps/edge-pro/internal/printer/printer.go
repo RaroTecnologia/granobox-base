@@ -1,6 +1,7 @@
 package printer
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
@@ -13,6 +14,23 @@ import (
 	"github.com/granobox/edge-pro/internal/models"
 	"github.com/rs/zerolog"
 )
+
+// PrinterStatus representa o status detalhado da impressora ZPL
+type PrinterStatus struct {
+	OK              bool   `json:"ok"`
+	PaperOut        bool   `json:"paperOut"`        // Sem papel/etiqueta
+	RibbonOut       bool   `json:"ribbonOut"`       // Sem ribbon
+	HeadOpen        bool   `json:"headOpen"`        // Tampa/cabeça aberta
+	Paused          bool   `json:"paused"`          // Impressora pausada
+	BufferFull      bool   `json:"bufferFull"`      // Buffer cheio
+	DiagnosticMode  bool   `json:"diagnosticMode"`  // Modo diagnóstico
+	PartialFormat   bool   `json:"partialFormat"`   // Formato parcial em buffer
+	Corrupt         bool   `json:"corrupt"`         // RAM corrompida
+	HeadTempError   bool   `json:"headTempError"`   // Erro temperatura cabeça
+	ErrorCode       string `json:"errorCode"`       // Código de erro
+	ErrorMessage    string `json:"errorMessage"`    // Mensagem de erro legível
+	RawResponse     string `json:"rawResponse"`     // Resposta bruta para debug
+}
 
 // Manager gerencia impressoras USB e Network
 type Manager struct {
@@ -353,6 +371,168 @@ func (m *Manager) SendToUSB(devicePath string, data []byte) error {
 		Msg("✅ Impressão USB finalizada")
 
 	return nil
+}
+
+// SendToUSBWithStatus envia dados e retorna status detalhado da impressora
+func (m *Manager) SendToUSBWithStatus(devicePath string, data []byte) (*PrinterStatus, error) {
+	// Primeiro, enviar o ZPL
+	err := m.SendToUSB(devicePath, data)
+	if err != nil {
+		return &PrinterStatus{
+			OK:           false,
+			ErrorMessage: err.Error(),
+		}, err
+	}
+
+	// Depois, consultar status da impressora
+	status := m.GetPrinterStatus(devicePath)
+	
+	if !status.OK {
+		return status, fmt.Errorf("erro na impressora: %s", status.ErrorMessage)
+	}
+
+	return status, nil
+}
+
+// GetPrinterStatus consulta o status da impressora ZPL usando comando ~HS
+func (m *Manager) GetPrinterStatus(devicePath string) *PrinterStatus {
+	status := &PrinterStatus{OK: true}
+
+	// Verificar se device existe
+	if _, err := os.Stat(devicePath); os.IsNotExist(err) {
+		status.OK = false
+		status.ErrorMessage = "Impressora desconectada"
+		return status
+	}
+
+	// Abrir device para leitura e escrita
+	file, err := os.OpenFile(devicePath, os.O_RDWR, 0)
+	if err != nil {
+		m.log.Debug().Err(err).Msg("⚠️ Não foi possível abrir device para consulta de status")
+		// Não é erro crítico - retornar OK assumindo que funcionou
+		return status
+	}
+	defer file.Close()
+
+	// Enviar comando Host Status Query (~HS)
+	_, err = file.Write([]byte("~HS\r\n"))
+	if err != nil {
+		m.log.Debug().Err(err).Msg("⚠️ Erro ao enviar comando ~HS")
+		return status
+	}
+
+	// Aguardar resposta
+	time.Sleep(200 * time.Millisecond)
+
+	// Ler resposta (com timeout)
+	file.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+	reader := bufio.NewReader(file)
+	
+	var response strings.Builder
+	for i := 0; i < 3; i++ { // Ler até 3 linhas
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		response.WriteString(line)
+	}
+
+	rawResponse := response.String()
+	status.RawResponse = rawResponse
+
+	if rawResponse == "" {
+		m.log.Debug().Msg("📋 Sem resposta do ~HS (impressora pode não suportar)")
+		return status
+	}
+
+	m.log.Debug().Str("response", rawResponse).Msg("📋 Resposta ~HS recebida")
+
+	// Parsear resposta ZPL Host Status
+	// Formato típico: <STX><STX>aaa,b,c,d,e,f,g,h,i,j,k,l,<ETX><CR><LF>
+	status = m.parseHostStatus(rawResponse)
+
+	return status
+}
+
+// parseHostStatus parseia a resposta do comando ~HS
+func (m *Manager) parseHostStatus(response string) *PrinterStatus {
+	status := &PrinterStatus{
+		OK:          true,
+		RawResponse: response,
+	}
+
+	// Limpar caracteres de controle
+	response = strings.ReplaceAll(response, "\x02", "") // STX
+	response = strings.ReplaceAll(response, "\x03", "") // ETX
+	response = strings.TrimSpace(response)
+
+	// Dividir por vírgulas
+	parts := strings.Split(response, ",")
+	if len(parts) < 11 {
+		m.log.Debug().Int("parts", len(parts)).Msg("⚠️ Resposta ~HS com formato inesperado")
+		return status
+	}
+
+	// Parsear flags do primeiro grupo (posições 0-7 são flags de status)
+	// Posição 1: Paper Out flag
+	// Posição 2: Pause flag
+	// Posição 3: Buffer Full flag
+	// etc.
+
+	// Verificar flags principais
+	if len(parts) > 1 && parts[1] == "1" {
+		status.PaperOut = true
+		status.OK = false
+		status.ErrorCode = "PAPER_OUT"
+		status.ErrorMessage = "Sem papel/etiqueta"
+	}
+
+	if len(parts) > 2 && parts[2] == "1" {
+		status.Paused = true
+		status.OK = false
+		status.ErrorCode = "PAUSED"
+		status.ErrorMessage = "Impressora pausada"
+	}
+
+	// Segundo grupo de resposta geralmente indica erros de hardware
+	// Buscar por indicadores comuns
+	responseUpper := strings.ToUpper(response)
+
+	if strings.Contains(responseUpper, "HEAD OPEN") || strings.Contains(responseUpper, "HEADOPEN") {
+		status.HeadOpen = true
+		status.OK = false
+		status.ErrorCode = "HEAD_OPEN"
+		status.ErrorMessage = "Tampa/cabeça aberta"
+	}
+
+	if strings.Contains(responseUpper, "RIBBON OUT") || strings.Contains(responseUpper, "RIBBONOUT") {
+		status.RibbonOut = true
+		status.OK = false
+		status.ErrorCode = "RIBBON_OUT"
+		status.ErrorMessage = "Sem ribbon"
+	}
+
+	if strings.Contains(responseUpper, "PAPER OUT") || strings.Contains(responseUpper, "PAPEROUT") ||
+		strings.Contains(responseUpper, "MEDIA OUT") {
+		status.PaperOut = true
+		status.OK = false
+		status.ErrorCode = "PAPER_OUT"
+		status.ErrorMessage = "Sem papel/etiqueta"
+	}
+
+	if strings.Contains(responseUpper, "HEAD TEMP") || strings.Contains(responseUpper, "OVERHEAT") {
+		status.HeadTempError = true
+		status.OK = false
+		status.ErrorCode = "HEAD_TEMP"
+		status.ErrorMessage = "Erro de temperatura da cabeça de impressão"
+	}
+
+	// Se múltiplos erros, combinar mensagens
+	if status.ErrorMessage == "" && !status.OK {
+		status.ErrorMessage = "Erro desconhecido na impressora"
+	}
+
+	return status
 }
 
 // SendToNetwork envia dados para impressora de rede via TCP (porta 9100)

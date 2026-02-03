@@ -197,6 +197,7 @@ func (q *Queue) processJob(workerID int, queuedJob *QueuedJob) {
 	}
 
 	// Enviar para impressora (com todas as cópias)
+	var lastPrinterStatus *PrinterStatus
 	for i := 0; i < copies; i++ {
 		q.log.Debug().
 			Int("copy", i+1).
@@ -204,15 +205,30 @@ func (q *Queue) processJob(workerID int, queuedJob *QueuedJob) {
 			Str("printer", targetPrinter.Name).
 			Msg("🖨️ Imprimindo cópia")
 
-		err = q.manager.SendToPrinter(targetPrinter, []byte(job.ZPL))
-		if err != nil {
-			q.handleJobError(queuedJob, fmt.Sprintf("Erro ao imprimir cópia %d/%d: %v", i+1, copies, err))
-			return
+		// ⭐ Usar SendToUSBWithStatus para obter feedback detalhado
+		if targetPrinter.Connection == "usb" && targetPrinter.DevicePath != nil {
+			status, err := q.manager.SendToUSBWithStatus(*targetPrinter.DevicePath, []byte(job.ZPL))
+			lastPrinterStatus = status
+			if err != nil {
+				// Erro com detalhes da impressora
+				errorMsg := fmt.Sprintf("Erro ao imprimir cópia %d/%d: %v", i+1, copies, err)
+				if status != nil && status.ErrorMessage != "" {
+					errorMsg = status.ErrorMessage
+				}
+				q.handleJobErrorWithStatus(queuedJob, errorMsg, status)
+				return
+			}
+		} else {
+			err = q.manager.SendToPrinter(targetPrinter, []byte(job.ZPL))
+			if err != nil {
+				q.handleJobError(queuedJob, fmt.Sprintf("Erro ao imprimir cópia %d/%d: %v", i+1, copies, err))
+				return
+			}
 		}
 	}
 
 	// Sucesso
-	q.handleJobSuccess(queuedJob, copies)
+	q.handleJobSuccessWithStatus(queuedJob, copies, lastPrinterStatus)
 }
 
 // handleJobError trata erro no processamento
@@ -270,8 +286,13 @@ func (q *Queue) handleJobError(queuedJob *QueuedJob, errorMsg string) {
 	}()
 }
 
-// handleJobSuccess trata sucesso no processamento
+// handleJobSuccess trata sucesso no processamento (sem status detalhado)
 func (q *Queue) handleJobSuccess(queuedJob *QueuedJob, copies int) {
+	q.handleJobSuccessWithStatus(queuedJob, copies, nil)
+}
+
+// handleJobSuccessWithStatus trata sucesso com status detalhado da impressora
+func (q *Queue) handleJobSuccessWithStatus(queuedJob *QueuedJob, copies int, printerStatus *PrinterStatus) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -288,12 +309,104 @@ func (q *Queue) handleJobSuccess(queuedJob *QueuedJob, copies int) {
 		Int("attempts", queuedJob.Attempts).
 		Msg("✅ Job processado com sucesso")
 
-	// Enviar resultado
+	// Enviar resultado com status da impressora
 	result := models.PrintJobResult{
 		JobID:     job.JobID,
 		Status:    "success",
 		Message:   fmt.Sprintf("Impressão concluída (%d cópias)", copies),
 		PrintedAt: time.Now(),
+	}
+
+	// ⭐ Incluir status detalhado da impressora
+	if printerStatus != nil {
+		result.PrinterStatus = &models.PrinterStatusResult{
+			OK:           printerStatus.OK,
+			ErrorCode:    printerStatus.ErrorCode,
+			ErrorMessage: printerStatus.ErrorMessage,
+			PaperOut:     printerStatus.PaperOut,
+			RibbonOut:    printerStatus.RibbonOut,
+			HeadOpen:     printerStatus.HeadOpen,
+			Paused:       printerStatus.Paused,
+		}
+	}
+
+	go func() {
+		q.resultChan <- result
+	}()
+}
+
+// handleJobErrorWithStatus trata erro com status detalhado da impressora
+func (q *Queue) handleJobErrorWithStatus(queuedJob *QueuedJob, errorMsg string, printerStatus *PrinterStatus) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	queuedJob.LastError = errorMsg
+	queuedJob.UpdatedAt = time.Now()
+
+	job := queuedJob.Job
+
+	// Verificar se deve retentar (NÃO retentar erros de hardware)
+	shouldRetry := queuedJob.Attempts < queuedJob.MaxAttempts
+	
+	// ⭐ NÃO retentar se for erro de hardware (papel, ribbon, tampa)
+	if printerStatus != nil && (printerStatus.PaperOut || printerStatus.RibbonOut || printerStatus.HeadOpen) {
+		shouldRetry = false
+		q.log.Warn().
+			Str("job_id", job.JobID).
+			Str("error_code", printerStatus.ErrorCode).
+			Msg("⚠️ Erro de hardware - não retentando")
+	}
+
+	if shouldRetry {
+		queuedJob.Status = JobStatusRetrying
+
+		q.log.Warn().
+			Str("job_id", job.JobID).
+			Int("attempt", queuedJob.Attempts).
+			Int("max_attempts", queuedJob.MaxAttempts).
+			Str("error", errorMsg).
+			Msg("⚠️ Job falhou, retentando...")
+
+		// Agendar retry
+		go func() {
+			time.Sleep(q.retryDelay)
+			q.jobChan <- queuedJob
+		}()
+
+		return
+	}
+
+	// Falha definitiva
+	queuedJob.Status = JobStatusFailed
+	now := time.Now()
+	queuedJob.CompletedAt = &now
+
+	q.log.Error().
+		Str("job_id", job.JobID).
+		Int("attempts", queuedJob.Attempts).
+		Str("error", errorMsg).
+		Msg("❌ Job falhou definitivamente")
+
+	// Enviar resultado com status da impressora
+	result := models.PrintJobResult{
+		JobID:     job.JobID,
+		Status:    "error",
+		Message:   fmt.Sprintf("Falha após %d tentativas", queuedJob.Attempts),
+		Error:     errorMsg,
+		PrintedAt: time.Now(),
+	}
+
+	// ⭐ Incluir status detalhado da impressora
+	if printerStatus != nil {
+		result.PrinterStatus = &models.PrinterStatusResult{
+			OK:           printerStatus.OK,
+			ErrorCode:    printerStatus.ErrorCode,
+			ErrorMessage: printerStatus.ErrorMessage,
+			PaperOut:     printerStatus.PaperOut,
+			RibbonOut:    printerStatus.RibbonOut,
+			HeadOpen:     printerStatus.HeadOpen,
+			Paused:       printerStatus.Paused,
+		}
 	}
 
 	go func() {
