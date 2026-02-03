@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/iot_device.dart';
 import '../theme/app_theme.dart';
 import '../providers/tagment_printer_config_provider.dart';
-import '../providers/tagment_print_provider.dart';
+import '../providers/print_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/tagment_printer_config_models.dart';
 import '../widgets/print_modal.dart';
@@ -30,7 +30,8 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
   final TextEditingController _offsetXController = TextEditingController();
   final TextEditingController _offsetYController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController(); // Nome do dispositivo
+  final TextEditingController _printerNameController = TextEditingController(); // ⭐ NOVO: Nome da impressora
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
     _offsetYController.dispose();
     _locationController.dispose();
     _nameController.dispose();
+    _printerNameController.dispose(); // ⭐ NOVO
     super.dispose();
   }
 
@@ -58,7 +60,7 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
       _currentConfig = configProvider.config ?? const TagmentPrinterConfig();
       
       // ✅ CARREGAR IMPRESSORAS PRIMEIRO!
-      final tagmentProvider = context.read<TagmentPrintProvider>();
+      final tagmentProvider = context.read<PrintProvider>();
       final authProvider = context.read<AuthProvider>();
       
       final token = await authProvider.authToken;
@@ -83,10 +85,12 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
         _offsetXController.text = printerInfo.offsetX?.toString() ?? '0';
         _offsetYController.text = printerInfo.offsetY?.toString() ?? '0';
         _locationController.text = printerInfo.location ?? '';
+        _printerNameController.text = printerInfo.displayName ?? ''; // ⭐ NOVO: Carregar nome da impressora
       } else {
         _offsetXController.text = '0';
         _offsetYController.text = '0';
         _locationController.text = '';
+        _printerNameController.text = ''; // ⭐ NOVO
       }
       
       setState(() => _isLoading = false);
@@ -158,29 +162,6 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
                   // Configuração da Impressora
                   _buildPrinterConfigCard(),
                   
-                  const SizedBox(height: 32),
-                  
-                  // Botões de ação
-                  Row(
-                    children: [
-                      // Botão de teste
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _testPrint,
-                          icon: const Icon(PhosphorIcons.printer),
-                          label: const Text('Testar'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppTheme.primary,
-                            side: BorderSide(color: AppTheme.primary),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -269,6 +250,29 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
                     ),
                   ],
                 ),
+                // Informações BLE (MAC e IP)
+                if (widget.edgeGoDevice.macAddress != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'MAC BLE: ${widget.edgeGoDevice.macAddress}',
+                    style: const TextStyle(
+                      color: AppTheme.dark300,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+                if (widget.edgeGoDevice.status?.ipAddress != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'IP: ${widget.edgeGoDevice.status!.ipAddress}',
+                    style: const TextStyle(
+                      color: AppTheme.dark300,
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -296,6 +300,8 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
           decoration: InputDecoration(
             labelText: 'Novo Nome',
             labelStyle: const TextStyle(color: AppTheme.dark300),
+            hintText: 'Ex: Expedição, Recebimento...',
+            hintStyle: const TextStyle(color: AppTheme.dark600),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: AppTheme.dark600),
@@ -395,7 +401,7 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
 
   Future<void> _testPrint() async {
     try {
-      final tagmentProvider = context.read<TagmentPrintProvider>();
+      final tagmentProvider = context.read<PrintProvider>();
       
       // Buscar impressora associada a este Edge-Go
       final printerInfo = tagmentProvider.impressoras.firstWhere(
@@ -467,7 +473,7 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
     debugPrint('🔍 [DEBUG] Status USB do dispositivo: $isUsbConnected');
     debugPrint('🔍 [DEBUG] Device status completo: ${deviceStatus?.toString()}');
 
-    return Consumer<TagmentPrintProvider>(
+    return Consumer<PrintProvider>(
       builder: (context, tagmentProvider, _) {
         // Buscar impressora associada a este Edge-Go (para informações adicionais)
         final printerInfo = tagmentProvider.impressoras.where(
@@ -737,6 +743,39 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
           
           const SizedBox(height: 16),
           
+          // ⭐ NOVO: Campo de nome da impressora
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Nome da Impressora',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _printerNameController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Ex: C3TECH - Validade, Zebra - Expedição...',
+                  hintStyle: const TextStyle(color: AppTheme.dark400),
+                  filled: true,
+                  fillColor: AppTheme.dark700,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
           // Campo de localização
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -874,38 +913,22 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
       final offsetX = double.tryParse(_offsetXController.text) ?? 0.0;
       final offsetY = double.tryParse(_offsetYController.text) ?? 0.0;
       final location = _locationController.text.trim();
+      final printerName = _printerNameController.text.trim(); // ⭐ NOVO: Nome da impressora
       
       print('🔧 GRANOBOX: Salvando configuração da impressora:');
+      print('🔧 GRANOBOX: Nome: $printerName'); // ⭐ NOVO
       print('🔧 GRANOBOX: Offset X: $offsetX');
       print('🔧 GRANOBOX: Offset Y: $offsetY');
       print('🔧 GRANOBOX: Location: $location');
       
       // Buscar impressora associada a este Edge-Go
-      final tagmentProvider = context.read<TagmentPrintProvider>();
+      final tagmentProvider = context.read<PrintProvider>();
       final authProvider = context.read<AuthProvider>();
       
       print('🔍 GRANOBOX: Buscando impressora para Edge-Go:');
       print('🔍 GRANOBOX: Edge-Go ID: ${widget.edgeGoDevice.id}');
       print('🔍 GRANOBOX: Edge-Go name: ${widget.edgeGoDevice.name}');
       print('🔍 GRANOBOX: Total de impressoras carregadas: ${tagmentProvider.impressoras.length}');
-      
-      // Mostrar info na tela também
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('🔍 Edge-Go: ${widget.edgeGoDevice.id} | Impressoras: ${tagmentProvider.impressoras.length}'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      
-      // Listar todas as impressoras e seus edgeAgentFingerprint
-      for (var i = 0; i < tagmentProvider.impressoras.length; i++) {
-        final p = tagmentProvider.impressoras[i];
-        print('🔍 GRANOBOX: Impressora $i: ${p.displayName}');
-        print('🔍 GRANOBOX:   - ID: ${p.id}');
-        print('🔍 GRANOBOX:   - edgeAgentFingerprint: ${p.edgeAgentFingerprint}');
-        print('🔍 GRANOBOX:   - isUSBPrinter: ${p.isUSBPrinter}');
-        print('🔍 GRANOBOX:   - isEdgeGo: ${p.isEdgeGo}');
-      }
       
       // Buscar impressora por ID do Edge-Go
       final printerInfo = tagmentProvider.impressoras.where(
@@ -914,17 +937,6 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
       
       print('🔍 GRANOBOX: Impressora encontrada: ${printerInfo?.displayName}');
       print('🔍 GRANOBOX: Impressora ID: ${printerInfo?.id}');
-      
-      // Mostrar resultado na tela
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(printerInfo != null 
-            ? '✅ Impressora encontrada: ${printerInfo.displayName}' 
-            : '❌ Nenhuma impressora encontrada para este Edge-Go'),
-          backgroundColor: printerInfo != null ? Colors.green : Colors.red,
-          duration: const Duration(seconds: 5),
-        ),
-      );
       
       if (printerInfo == null) {
         throw Exception('Impressora não encontrada para este Edge-Go');
@@ -940,25 +952,27 @@ class _EdgeGoPrintConfigScreenState extends State<EdgeGoPrintConfigScreen> {
       final success = await granoboxService.updatePrinter(
         token: token,
         printerId: printerInfo.id,
+        name: printerName.isNotEmpty ? printerName : null, // ⭐ NOVO: Salvar nome da impressora
         location: location.isNotEmpty ? location : null,
         offsetX: offsetX,
         offsetY: offsetY,
       );
       
       if (success) {
-        // Recarregar impressoras para refletir as mudanças
+        // Recarregar impressoras para refletir as mudanças (incluindo o novo nome)
         final clientId = authProvider.user?.clientId;
         if (clientId != null) {
-          await tagmentProvider.carregarImpressoras(
+          await tagmentProvider.forcarAtualizacaoImpressoras(
             token: token,
             clientId: clientId,
-            forceRefresh: true,
           );
         }
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Configuração da impressora salva com sucesso!'),
+          SnackBar(
+            content: Text(printerName.isNotEmpty 
+              ? '✅ Impressora "$printerName" atualizada com sucesso!'
+              : '✅ Configuração da impressora salva com sucesso!'),
             backgroundColor: Colors.green,
           ),
         );
