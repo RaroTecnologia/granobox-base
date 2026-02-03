@@ -25,27 +25,27 @@ import (
 // Client é o cliente WebSocket puro (não Socket.IO)
 // Constantes do watchdog USB
 const (
-	USBWatchdogCheckInterval = 5 * time.Second  // Verificar a cada 5 segundos
-	USBWatchdogMaxCycles     = 12               // 12 ciclos * 5s = 1 minuto
+	USBWatchdogCheckInterval = 5 * time.Second // Verificar a cada 5 segundos
+	USBWatchdogMaxCycles     = 12              // 12 ciclos * 5s = 1 minuto
 )
 
 type Client struct {
-	cfg              *config.SocketIOConfig
-	deviceCfg        *config.DeviceConfig
-	log              zerolog.Logger
-	conn             *websocket.Conn
-	connected        bool
-	registered       bool
-	mu               sync.RWMutex
-	stopCh           chan struct{}
-	metricsCollector *metrics.Collector
-	printerManager   *printer.Manager
-	printQueue       *printer.Queue
-	printers         []models.PrinterInfo
-	handlers         map[string]func(interface{})
-	pingTicker       *time.Ticker
-	certManager      *certmanager.Manager
-	reconnectDelay   time.Duration
+	cfg               *config.SocketIOConfig
+	deviceCfg         *config.DeviceConfig
+	log               zerolog.Logger
+	conn              *websocket.Conn
+	connected         bool
+	registered        bool
+	mu                sync.RWMutex
+	stopCh            chan struct{}
+	metricsCollector  *metrics.Collector
+	printerManager    *printer.Manager
+	printQueue        *printer.Queue
+	printers          []models.PrinterInfo
+	handlers          map[string]func(interface{})
+	pingTicker        *time.Ticker
+	certManager       *certmanager.Manager
+	reconnectDelay    time.Duration
 	maxReconnectDelay time.Duration
 	// Watchdog USB
 	usbDisconnectedCycles int
@@ -104,8 +104,10 @@ func NewClient(cfg *config.SocketIOConfig, deviceCfg *config.DeviceConfig, log z
 	// Monitorar resultados da fila
 	go client.monitorPrintResults()
 
-	// 🆕 Iniciar watchdog USB (monitora se impressora desconecta)
-	go client.startUSBWatchdog()
+	// ⚠️ Watchdog USB desabilitado no Raspberry Pi
+	// No Pi, se não há impressora, é porque realmente não há uma conectada
+	// Não faz sentido reiniciar o dispositivo por isso
+	// go client.startUSBWatchdog()
 
 	// Setup handlers
 	client.setupHandlers()
@@ -247,12 +249,17 @@ func (c *Client) doConnect() error {
 	// WebSocket puro: /edge-go-ws (mesmo endpoint do Edge-Go)
 	// ⭐ Remover porta do hostname (igual ao Edge-Go)
 	hostname := serverURL.Hostname() // Remove porta automaticamente
-	
+
 	var wsURL string
-	// Se for produção (granobox.com.br), usar ws.granobox.com.br (porta 443, WSS)
-	if strings.Contains(hostname, "granobox.com.br") {
-		wsURL = "wss://ws.granobox.com.br/edge-go-ws"
-		c.log.Info().Str("url", wsURL).Msg("🌐 Modo PRODUÇÃO - usando wss://ws.granobox.com.br/edge-go-ws")
+	// Determinar URL do WebSocket baseado no ambiente
+	if strings.Contains(hostname, "staging.granobox.com.br") {
+		// Staging: usar edge.granobox.com.br (mesmo ws-service, isolado por clientId)
+		wsURL = "wss://edge.granobox.com.br/edge-go-ws"
+		c.log.Info().Str("url", wsURL).Msg("🧪 Modo STAGING - usando wss://edge.granobox.com.br/edge-go-ws")
+	} else if strings.Contains(hostname, "granobox.com.br") {
+		// Produção: usar edge.granobox.com.br (ws-service separado)
+		wsURL = "wss://edge.granobox.com.br/edge-go-ws"
+		c.log.Info().Str("url", wsURL).Msg("🌐 Modo PRODUÇÃO - usando wss://edge.granobox.com.br/edge-go-ws")
 	} else {
 		// Desenvolvimento: usar o hostname da API com porta 8081
 		if serverURL.Scheme == "https" {
@@ -308,7 +315,7 @@ func (c *Client) doConnect() error {
 	c.connected = true
 	c.registered = false
 	c.mu.Unlock()
-	
+
 	c.log.Info().Msg("✅ Estado atualizado: connected=true, registered=false")
 
 	// Reset reconnect delay em caso de sucesso
@@ -327,23 +334,23 @@ func (c *Client) doConnect() error {
 	// Enviar registro imediatamente após conectar
 	go func() {
 		time.Sleep(1 * time.Second) // Aumentar delay para garantir estabilização
-		
+
 		// Verificar estado antes de enviar
 		c.mu.RLock()
 		connected := c.connected
 		connCheck := c.conn
 		c.mu.RUnlock()
-		
+
 		c.log.Info().
 			Bool("connected", connected).
 			Bool("conn_not_nil", connCheck != nil).
 			Msg("🔍 Estado antes de enviar registro")
-		
+
 		if !connected || connCheck == nil {
 			c.log.Error().Msg("❌ Não foi possível enviar registro: conexão não estabelecida")
 			return
 		}
-		
+
 		if err := c.sendRegister(); err != nil {
 			c.log.Error().Err(err).Msg("Erro ao enviar registro")
 		}
@@ -503,6 +510,8 @@ func (c *Client) sendRegister() error {
 	}
 
 	localIP := metrics.GetLocalIP()
+	lanIP := metrics.GetLANIP()
+	wifiIP := metrics.GetWiFiIP()
 	macAddr := metrics.GetMacAddress()
 
 	// Auto-detectar impressoras USB
@@ -518,17 +527,19 @@ func (c *Client) sendRegister() error {
 	// ⭐ FORMATO CORRETO: deviceId e clientId na RAIZ da mensagem, outros dados em "data"
 	// A API espera: { type: "register", deviceId: "...", clientId: "...", data: { ... } }
 	registerData := map[string]interface{}{
-		"authToken": c.cfg.APIKey,
-		"name":      deviceName,
-		"hostname":  hostname,
-		"version":   c.deviceCfg.Version,
-		"platform":  "linux-arm64", // Raspberry Pi
-		"ip":        localIP,
-		"mac":       macAddr,
-		"freeHeap":  0, // Não aplicável em Linux
-		"cpuUsage":  systemMetrics.CPUUsage,
+		"authToken":   c.cfg.APIKey,
+		"name":        deviceName,
+		"hostname":    hostname,
+		"version":     c.deviceCfg.Version,
+		"platform":    "linux-arm64", // Raspberry Pi
+		"ip":          localIP,       // IP principal (LAN ou WiFi)
+		"lanIp":       lanIP,         // ⭐ IP da LAN (eth0)
+		"wifiIp":      wifiIP,        // ⭐ IP do WiFi (wlan0)
+		"mac":         macAddr,
+		"freeHeap":    0, // Não aplicável em Linux
+		"cpuUsage":    systemMetrics.CPUUsage,
 		"memoryUsage": systemMetrics.MemoryUsage,
-		"uptime":    systemMetrics.Uptime,
+		"uptime":      systemMetrics.Uptime,
 		"capabilities": map[string]interface{}{
 			"usb":         true,
 			"display":     false,
@@ -561,11 +572,11 @@ func (c *Client) sendRegister() error {
 // Igual ao Edge-Go que faz isso via /auth/device
 func (c *Client) fetchDeviceInfo() error {
 	c.log.Info().Msg("🔍 Buscando clientId do backend via /auth/device...")
-	
+
 	// Construir URL da API
 	backendURL := strings.TrimSuffix(c.cfg.ServerURL, "/")
 	authURL := fmt.Sprintf("%s/auth/device", backendURL)
-	
+
 	// Preparar request body
 	body, err := json.Marshal(map[string]interface{}{
 		"deviceId": c.cfg.AgentFingerprint,
@@ -574,15 +585,15 @@ func (c *Client) fetchDeviceInfo() error {
 	if err != nil {
 		return fmt.Errorf("erro ao preparar request: %w", err)
 	}
-	
+
 	// Criar request
 	req, err := http.NewRequest("POST", authURL, strings.NewReader(string(body)))
 	if err != nil {
 		return fmt.Errorf("erro ao criar request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Executar request
 	client := c.newHTTPClient(10 * time.Second)
 	resp, err := client.Do(req)
@@ -590,11 +601,11 @@ func (c *Client) fetchDeviceInfo() error {
 		return fmt.Errorf("erro ao executar request: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("auth/device retornou status %d", resp.StatusCode)
 	}
-	
+
 	// Parsear response
 	var authResp struct {
 		AccessToken string `json:"access_token"`
@@ -607,22 +618,22 @@ func (c *Client) fetchDeviceInfo() error {
 			OperationID string `json:"operationId"`
 		} `json:"device"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
 		return fmt.Errorf("erro ao parsear response: %w", err)
 	}
-	
+
 	// Salvar clientId e operationId
 	if authResp.Device.ClientID != "" {
 		c.deviceCfg.ClientID = authResp.Device.ClientID
 		c.log.Info().Str("clientId", authResp.Device.ClientID).Msg("✅ ClientID obtido do backend")
 	}
-	
+
 	if authResp.Device.OperationID != "" {
 		c.deviceCfg.OperationID = authResp.Device.OperationID
 		c.log.Info().Str("operationId", authResp.Device.OperationID).Msg("✅ OperationID obtido do backend")
 	}
-	
+
 	return nil
 }
 
@@ -660,28 +671,32 @@ func (c *Client) SendHeartbeat() error {
 	}
 
 	localIP := metrics.GetLocalIP()
+	lanIP := metrics.GetLANIP()
+	wifiIP := metrics.GetWiFiIP()
 	macAddr := metrics.GetMacAddress()
 
 	// Obter estatísticas da fila
 	queueStats := c.printQueue.GetStats()
 
 	heartbeatData := map[string]interface{}{
-		"deviceId":       c.cfg.AgentFingerprint,
-		"status":         "online",
-		"uptime":         systemMetrics.Uptime,
-		"freeHeap":       0, // Não aplicável
-		"cpuUsage":       systemMetrics.CPUUsage,
-		"memoryUsage":    systemMetrics.MemoryUsage,
-		"temperature":    systemMetrics.Temperature,
-		"diskUsage":      systemMetrics.DiskUsage,
-		"rssi":           0, // Não aplicável
-		"usbConnected":   len(usbPrinters) > 0,
-		"ip":             localIP,
-		"mac":            macAddr,
-		"printers":       printersForHeartbeat,
-		"queueStats":     queueStats,
-		"version":        c.deviceCfg.Version,  // 🆕 Versão do firmware para o backend salvar
-		"platform":       "linux-arm64",        // 🆕 Plataforma (Raspberry Pi)
+		"deviceId":     c.cfg.AgentFingerprint,
+		"status":       "online",
+		"uptime":       systemMetrics.Uptime,
+		"freeHeap":     0, // Não aplicável
+		"cpuUsage":     systemMetrics.CPUUsage,
+		"memoryUsage":  systemMetrics.MemoryUsage,
+		"temperature":  systemMetrics.Temperature,
+		"diskUsage":    systemMetrics.DiskUsage,
+		"rssi":         0, // Não aplicável
+		"usbConnected": len(usbPrinters) > 0,
+		"ip":           localIP, // IP principal (LAN ou WiFi)
+		"lanIp":        lanIP,   // ⭐ IP da LAN (eth0)
+		"wifiIp":       wifiIP,  // ⭐ IP do WiFi (wlan0)
+		"mac":          macAddr,
+		"printers":     printersForHeartbeat,
+		"queueStats":   queueStats,
+		"version":      c.deviceCfg.Version, // 🆕 Versão do firmware para o backend salvar
+		"platform":     "linux-arm64",       // 🆕 Plataforma (Raspberry Pi)
 	}
 
 	c.log.Info().
@@ -720,23 +735,23 @@ func (c *Client) sendRegisterMessage(deviceId, clientId string, data interface{}
 	connected := c.connected
 	conn := c.conn
 	c.mu.RUnlock()
-	
+
 	c.log.Info().
 		Bool("connected", connected).
 		Bool("conn_not_nil", conn != nil).
 		Str("deviceId", deviceId).
 		Msg("🔍 sendRegisterMessage - verificando estado")
-	
+
 	if !connected {
 		c.log.Warn().Msg("⚠️ Tentativa de enviar register mas não está conectado")
 		return fmt.Errorf("não conectado")
 	}
-	
+
 	if conn == nil {
 		c.log.Warn().Msg("⚠️ Tentativa de enviar register mas conexão é nil")
 		return fmt.Errorf("conexão não inicializada")
 	}
-	
+
 	// ⭐ Formato especial para register: deviceId e clientId na RAIZ, não em data
 	msg := map[string]interface{}{
 		"type":      "register",
@@ -756,7 +771,7 @@ func (c *Client) sendRegisterMessage(deviceId, clientId string, data interface{}
 		Str("clientId", clientId).
 		Str("json", string(msgJSON)).
 		Msg("📤 Enviando mensagem register com formato correto...")
-	
+
 	if err := conn.WriteMessage(websocket.TextMessage, msgJSON); err != nil {
 		c.log.Error().Err(err).Msg("❌ Erro ao enviar mensagem register")
 		return fmt.Errorf("erro ao enviar mensagem: %w", err)
@@ -824,9 +839,9 @@ func (c *Client) processPrintJob(data interface{}) {
 
 		// Criar job no formato interno
 		job := models.PrintJob{
-			JobID:   jobV15.JobID,
-			ZPL:     jobV15.ZPL,
-			Copies:  jobV15.Copies,
+			JobID:     jobV15.JobID,
+			ZPL:       jobV15.ZPL,
+			Copies:    jobV15.Copies,
 			PrinterID: "USE_FIRST_AVAILABLE",
 		}
 
@@ -973,31 +988,31 @@ func (c *Client) handlePing(data interface{}) {
 		c.log.Error().Msg("❌ Dados do ping inválidos")
 		return
 	}
-	
+
 	requestId, _ := dataMap["requestId"].(string)
 	if requestId == "" {
 		c.log.Warn().Msg("⚠️  Ping sem requestId")
 		return
 	}
-	
+
 	c.log.Info().Str("requestId", requestId).Msg("🏓 Respondendo ping...")
-	
+
 	// Verificar se há impressoras USB disponíveis
 	usbPrinters := c.printerManager.CreateAutoUSBPrinters()
 	printerStatus := "offline"
 	if len(usbPrinters) > 0 {
 		printerStatus = "online"
 	}
-	
+
 	// Responder com status da impressora
 	response := map[string]interface{}{
-		"requestId":     requestId,
-		"status":        printerStatus,
-		"usbConnected":  len(usbPrinters) > 0,
-		"printerCount":  len(usbPrinters),
-		"timestamp":     time.Now().UnixMilli(),
+		"requestId":    requestId,
+		"status":       printerStatus,
+		"usbConnected": len(usbPrinters) > 0,
+		"printerCount": len(usbPrinters),
+		"timestamp":    time.Now().UnixMilli(),
 	}
-	
+
 	if len(usbPrinters) > 0 {
 		// Incluir informações da primeira impressora
 		p := usbPrinters[0]
@@ -1007,7 +1022,7 @@ func (c *Client) handlePing(data interface{}) {
 			response["devicePath"] = *p.DevicePath
 		}
 	}
-	
+
 	c.sendMessage("pong", response)
 	c.log.Info().Str("requestId", requestId).Str("status", printerStatus).Msg("✅ Pong enviado")
 }
@@ -1236,16 +1251,16 @@ func (c *Client) registerPrintersWithBackend() {
 			printerName = fmt.Sprintf("Edge-Pro %s", c.cfg.AgentFingerprint[len(c.cfg.AgentFingerprint)-8:])
 		}
 
-	// Usar o deviceId correto (edge-pro-)
-	payload := map[string]interface{}{
-		"name":         printerName,
-		"type":         "edge",
-		"deviceId":     c.cfg.AgentFingerprint, // ✅ Usar prefixo correto edge-pro-
-		"ip":           localIP,
-		"port":         9100,
-		"isUSBPrinter": true,
-		"status":       "active",
-	}
+		// Usar o deviceId correto (edge-pro-)
+		payload := map[string]interface{}{
+			"name":         printerName,
+			"type":         "edge",
+			"deviceId":     c.cfg.AgentFingerprint, // ✅ Usar prefixo correto edge-pro-
+			"ip":           localIP,
+			"port":         9100,
+			"isUSBPrinter": true,
+			"status":       "active",
+		}
 
 		payloadBytes, err := json.Marshal(payload)
 		if err != nil {
@@ -1380,8 +1395,8 @@ func (c *Client) handleOTAChunk(data interface{}) {
 	progress := c.otaManager.GetProgress()
 	bytesReceived := c.otaManager.GetBytesReceived()
 	c.sendMessage("ota_chunk_ack", map[string]interface{}{
-		"sequence":      int(sequence),
-		"progress":      progress,
+		"sequence":       int(sequence),
+		"progress":       progress,
 		"bytes_received": bytesReceived,
 	})
 

@@ -15,10 +15,15 @@ const (
 	FlagFile   = "/etc/edge-pro/configured"
 )
 
-// Config estrutura de configuração persistente
+// Config estrutura de configuração persistente (igual Edge-Go)
 type Config struct {
+	DeviceID       string `json:"device_id,omitempty"` // ⭐ NOVO: device_id (nome do dispositivo)
 	WiFiSSID       string `json:"wifi_ssid"`
 	WiFiPassword   string `json:"wifi_password"`
+	UseStaticIP    bool   `json:"use_static_ip,omitempty"` // ⭐ NOVO: IP estático
+	StaticIP       string `json:"static_ip,omitempty"`     // ⭐ NOVO: IP estático
+	Gateway        string `json:"gateway,omitempty"`       // ⭐ NOVO: Gateway
+	Netmask        string `json:"netmask,omitempty"`       // ⭐ NOVO: Netmask
 	Fingerprint    string `json:"fingerprint"`
 	APIKey         string `json:"api_key,omitempty"`
 	BackendURL     string `json:"backend_url,omitempty"`

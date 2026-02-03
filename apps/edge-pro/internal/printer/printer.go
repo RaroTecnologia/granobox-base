@@ -89,6 +89,16 @@ func (m *Manager) DetectUSBPrintersWithInfo() ([]USBPrinterInfo, error) {
 		if strings.HasPrefix(name, "lp") {
 			devicePath := filepath.Join("/dev/usb", name)
 
+			// ⭐ VERIFICAR SE O DISPOSITIVO ESTÁ REALMENTE ACESSÍVEL
+			// Tentar abrir o dispositivo para verificar se está realmente conectado
+			// (o arquivo pode existir mesmo após desconexão - cache do kernel)
+			if !m.isDeviceAccessible(devicePath) {
+				m.log.Debug().
+					Str("device", devicePath).
+					Msg("⚠️  Dispositivo encontrado mas não acessível (provavelmente desconectado)")
+				continue // Pular este dispositivo
+			}
+
 			// Obter informações do dispositivo
 			info := m.getUSBDeviceInfo(devicePath)
 			printers = append(printers, info)
@@ -102,6 +112,24 @@ func (m *Manager) DetectUSBPrintersWithInfo() ([]USBPrinterInfo, error) {
 	}
 
 	return printers, nil
+}
+
+// isDeviceAccessible verifica se um dispositivo USB está realmente acessível
+// (não apenas se o arquivo existe, mas se pode ser aberto para escrita)
+func (m *Manager) isDeviceAccessible(devicePath string) bool {
+	// Tentar abrir o dispositivo em modo write-only para verificar se está acessível
+	// Para impressoras, precisamos de escrita, então testamos O_WRONLY
+	file, err := os.OpenFile(devicePath, os.O_WRONLY, 0)
+	if err != nil {
+		// Se não conseguir abrir, o dispositivo não está acessível
+		m.log.Debug().
+			Str("device", devicePath).
+			Err(err).
+			Msg("⚠️  Dispositivo não acessível (erro ao abrir)")
+		return false
+	}
+	file.Close()
+	return true
 }
 
 // getUSBDeviceInfo obtém informações detalhadas de um dispositivo USB

@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/rs/zerolog"
 	"github.com/granobox/edge-pro/internal/config"
 	"github.com/granobox/edge-pro/internal/display"
 	"github.com/granobox/edge-pro/internal/models"
+	"github.com/granobox/edge-pro/internal/provisioning"
 	"github.com/granobox/edge-pro/internal/websocket"
 	"github.com/granobox/edge-pro/pkg/logger"
+	"github.com/rs/zerolog"
+	"gopkg.in/yaml.v3"
 )
 
 // Server servidor HTTP API
@@ -26,20 +30,29 @@ type Server struct {
 	startTime  time.Time
 	router     *chi.Mux
 	httpServer *http.Server
+	configPath string                            // ⭐ Caminho do config.yaml para atualização
+	pm         *provisioning.ProvisioningManager // ⭐ Provisioning manager para atualizar API Key
 }
 
 // New cria um novo servidor API
 func New(cfg *config.Config, displayClient *display.Client, wsClient *websocket.Client) *Server {
 	s := &Server{
-		cfg:       cfg,
-		display:   displayClient,
-		wsClient:  wsClient,
-		log:       logger.New("api"),
-		startTime: time.Now(),
+		cfg:        cfg,
+		display:    displayClient,
+		wsClient:   wsClient,
+		log:        logger.New("api"),
+		startTime:  time.Now(),
+		configPath: "/etc/edge-pro/config.yaml",         // ⭐ Caminho padrão do config
+		pm:         provisioning.New(logger.New("api")), // ⭐ Provisioning manager
 	}
 
 	s.setupRoutes()
 	return s
+}
+
+// SetConfigPath define o caminho do config.yaml (para atualização)
+func (s *Server) SetConfigPath(path string) {
+	s.configPath = path
 }
 
 // setupRoutes configura as rotas da API
@@ -68,6 +81,9 @@ func (s *Server) setupRoutes() {
 	// WebSocket
 	r.Post("/websocket/emit", s.handleWebSocketEmit)
 	r.Get("/websocket/status", s.handleWebSocketStatus)
+
+	// ⭐ Configuração (para adoção)
+	r.Post("/update-api-key", s.handleUpdateAPIKey)
 
 	s.router = r
 }
@@ -206,7 +222,7 @@ func (s *Server) handleDisplayBrightness(w http.ResponseWriter, r *http.Request)
 // handleDisplayRefresh força refresh do dashboard do Granobox
 func (s *Server) handleDisplayRefresh(w http.ResponseWriter, r *http.Request) {
 	ip := getLocalIP()
-	
+
 	if err := s.display.ShowStatus(
 		"✅",
 		"Online",
@@ -266,7 +282,7 @@ func (s *Server) handleWebSocketStatus(w http.ResponseWriter, r *http.Request) {
 		"timestamp":   time.Now(),
 		"server_url":  s.cfg.SocketIO.ServerURL,
 		"fingerprint": s.cfg.SocketIO.AgentFingerprint,
-		"ws_url":      fmt.Sprintf("wss://ws.granobox.com.br/edge-go-ws"),
+		"ws_url":      fmt.Sprintf("wss://edge.granobox.com.br/edge-go-ws"),
 		"protocol":    "websocket-pure",
 	})
 }
@@ -281,6 +297,131 @@ func (s *Server) jsonResponse(w http.ResponseWriter, status int, data interface{
 // errorResponse envia resposta de erro
 func (s *Server) errorResponse(w http.ResponseWriter, status int, message string) {
 	s.jsonResponse(w, status, map[string]string{"error": message})
+}
+
+// handleUpdateAPIKey atualiza a API Key no config.yaml e reinicia o serviço
+func (s *Server) handleUpdateAPIKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		APIKey           string `json:"api_key"`
+		Fingerprint      string `json:"fingerprint,omitempty"`
+		AgentFingerprint string `json:"agent_fingerprint,omitempty"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.errorResponse(w, http.StatusBadRequest, "JSON inválido")
+		return
+	}
+
+	if req.APIKey == "" {
+		s.errorResponse(w, http.StatusBadRequest, "api_key é obrigatório")
+		return
+	}
+
+	s.log.Info().Str("api_key", req.APIKey[:min(20, len(req.APIKey))]+"...").Msg("🔄 Atualizando API Key...")
+
+	// 1. Atualizar provisioning config (JSON)
+	provisioningCfg, err := s.pm.LoadConfig()
+	if err == nil {
+		provisioningCfg.APIKey = req.APIKey
+		if req.Fingerprint != "" {
+			provisioningCfg.Fingerprint = req.Fingerprint
+		}
+		if err := s.pm.SaveConfig(provisioningCfg); err != nil {
+			s.log.Warn().Err(err).Msg("⚠️  Erro ao salvar provisioning config")
+		} else {
+			s.log.Info().Msg("✅ Provisioning config atualizado")
+		}
+	}
+
+	// 2. Atualizar config.yaml
+	if err := s.updateYAMLConfig(req.APIKey, req.Fingerprint, req.AgentFingerprint); err != nil {
+		s.log.Error().Err(err).Msg("❌ Erro ao atualizar config.yaml")
+		s.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("Erro ao atualizar config: %v", err))
+		return
+	}
+
+	s.log.Info().Msg("✅ Config.yaml atualizado")
+
+	// 3. Reiniciar serviço systemd
+	go func() {
+		time.Sleep(1 * time.Second)
+		cmd := exec.Command("sudo", "systemctl", "restart", "edge-pro.service")
+		if err := cmd.Run(); err != nil {
+			s.log.Error().Err(err).Msg("❌ Erro ao reiniciar serviço")
+		} else {
+			s.log.Info().Msg("🔄 Serviço reiniciado")
+		}
+	}()
+
+	s.jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"success": true,
+		"message": "API Key atualizada com sucesso! Reiniciando serviço...",
+	})
+}
+
+// updateYAMLConfig atualiza a API Key no config.yaml
+func (s *Server) updateYAMLConfig(apiKey, fingerprint, agentFingerprint string) error {
+	// Ler YAML atual
+	data, err := os.ReadFile(s.configPath)
+	if err != nil {
+		return fmt.Errorf("erro ao ler config: %w", err)
+	}
+
+	// Parse YAML
+	var yamlData map[string]interface{}
+	if err := yaml.Unmarshal(data, &yamlData); err != nil {
+		return fmt.Errorf("erro ao fazer parse do YAML: %w", err)
+	}
+
+	// Atualizar API Key
+	if socketio, ok := yamlData["socketio"].(map[string]interface{}); ok {
+		socketio["api_key"] = apiKey
+		if agentFingerprint != "" {
+			socketio["agent_fingerprint"] = agentFingerprint
+		} else if fingerprint != "" {
+			socketio["agent_fingerprint"] = fingerprint
+		}
+	} else {
+		yamlData["socketio"] = map[string]interface{}{
+			"api_key": apiKey,
+		}
+		if agentFingerprint != "" {
+			yamlData["socketio"].(map[string]interface{})["agent_fingerprint"] = agentFingerprint
+		} else if fingerprint != "" {
+			yamlData["socketio"].(map[string]interface{})["agent_fingerprint"] = fingerprint
+		}
+	}
+
+	// Atualizar device.id se fornecido
+	if fingerprint != "" {
+		if device, ok := yamlData["device"].(map[string]interface{}); ok {
+			device["id"] = fingerprint
+		} else {
+			yamlData["device"] = map[string]interface{}{
+				"id": fingerprint,
+			}
+		}
+	}
+
+	// Salvar YAML
+	updatedData, err := yaml.Marshal(yamlData)
+	if err != nil {
+		return fmt.Errorf("erro ao serializar YAML: %w", err)
+	}
+
+	if err := os.WriteFile(s.configPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("erro ao salvar config: %w", err)
+	}
+
+	return nil
+}
+
+// min retorna o menor valor entre dois inteiros
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // getLocalIP retorna o IP local

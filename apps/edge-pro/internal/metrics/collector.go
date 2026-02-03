@@ -170,8 +170,17 @@ func (c *Collector) GetTotalMemory() uint64 {
 	return 0
 }
 
-// GetLocalIP retorna o endereço IP local
+// GetLocalIP retorna o endereço IP local (primeiro disponível - LAN ou WiFi)
 func GetLocalIP() string {
+	// Priorizar LAN (eth0) sobre WiFi (wlan0)
+	if lanIP := GetLANIP(); lanIP != "" {
+		return lanIP
+	}
+	if wifiIP := GetWiFiIP(); wifiIP != "" {
+		return wifiIP
+	}
+	
+	// Fallback: qualquer IP não-loopback
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "unknown"
@@ -186,6 +195,39 @@ func GetLocalIP() string {
 	}
 
 	return "unknown"
+}
+
+// GetLANIP retorna o IP da interface Ethernet (eth0)
+func GetLANIP() string {
+	return getInterfaceIP("eth0")
+}
+
+// GetWiFiIP retorna o IP da interface WiFi (wlan0)
+func GetWiFiIP() string {
+	return getInterfaceIP("wlan0")
+}
+
+// getInterfaceIP obtém o IP de uma interface específica
+func getInterfaceIP(ifaceName string) string {
+	iface, err := net.InterfaceByName(ifaceName)
+	if err != nil {
+		return ""
+	}
+	
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return ""
+	}
+	
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	
+	return ""
 }
 
 // GetMacAddress retorna o endereço MAC
