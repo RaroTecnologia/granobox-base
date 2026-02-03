@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,18 +16,29 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiBody,
 } from '@nestjs/swagger';
 
 import { ClientsService } from './clients.service';
+import { PrintConfigService } from './print-config.service';
+import { TemplatesService } from '../templates/templates.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { UpdatePrintConfigDto } from './dto/update-print-config.dto';
 import { Client } from './entities/client.entity';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SystemOnlyGuard } from '../auth/guards/system-only.guard';
 
 @ApiTags('Clients')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('clients')
 export class ClientsController {
-  constructor(private readonly clientsService: ClientsService) {}
+  constructor(
+    private readonly clientsService: ClientsService,
+    private readonly printConfigService: PrintConfigService,
+    private readonly templatesService: TemplatesService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Criar novo cliente' })
@@ -52,6 +64,52 @@ export class ClientsController {
   })
   findAll(): Promise<Client[]> {
     return this.clientsService.findAll();
+  }
+
+  @Get(':id/print-config')
+  @UseGuards(SystemOnlyGuard)
+  @ApiOperation({ summary: '[Admin] Obter configuração de impressão do cliente (templates + impressoras)' })
+  @ApiParam({ name: 'id', description: 'ID do cliente' })
+  @ApiResponse({ status: 200, description: 'Config de impressão (provider, templates, impressoras)' })
+  @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
+  getPrintConfig(@Param('id') id: string) {
+    return this.printConfigService.getPrintConfig(id);
+  }
+
+  @Patch(':id/print-config')
+  @UseGuards(SystemOnlyGuard)
+  @ApiOperation({ summary: '[Admin] Atualizar configuração de impressão do cliente' })
+  @ApiParam({ name: 'id', description: 'ID do cliente' })
+  @ApiResponse({ status: 200, description: 'Config atualizada' })
+  @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
+  updatePrintConfig(
+    @Param('id') id: string,
+    @Body() dto: UpdatePrintConfigDto,
+  ) {
+    return this.printConfigService.updatePrintConfig(id, dto);
+  }
+
+  @Get(':id/public-templates')
+  @UseGuards(SystemOnlyGuard)
+  @ApiOperation({ summary: '[Admin] Listar IDs dos templates públicos que o cliente pode acessar' })
+  @ApiParam({ name: 'id', description: 'ID do cliente' })
+  @ApiResponse({ status: 200, description: 'Lista de templateIds' })
+  getPublicTemplates(@Param('id') id: string): Promise<string[]> {
+    return this.templatesService.getPublicTemplateIdsForClient(id);
+  }
+
+  @Patch(':id/public-templates')
+  @UseGuards(SystemOnlyGuard)
+  @ApiOperation({ summary: '[Admin] Definir quais templates públicos o cliente pode acessar' })
+  @ApiParam({ name: 'id', description: 'ID do cliente' })
+  @ApiBody({ schema: { type: 'object', properties: { templateIds: { type: 'array', items: { type: 'string', format: 'uuid' } } } } })
+  @ApiResponse({ status: 200, description: 'Associação atualizada' })
+  async setPublicTemplates(
+    @Param('id') id: string,
+    @Body() body: { templateIds: string[] },
+  ): Promise<{ message: string }> {
+    await this.templatesService.setPublicTemplatesForClient(id, body.templateIds ?? []);
+    return { message: 'Templates públicos do cliente atualizados' };
   }
 
   @Get(':id')

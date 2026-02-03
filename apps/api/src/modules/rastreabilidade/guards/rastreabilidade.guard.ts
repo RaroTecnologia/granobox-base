@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { LimitsService } from '../../limits/limits.service';
 import { RastreabilidadeFeature } from '../decorators/require-rastreabilidade-feature.decorator';
@@ -24,17 +29,19 @@ export class RastreabilidadeGuard implements CanActivate {
     const user = request.user;
 
     if (!user?.clientId) {
-      throw new ForbiddenException('ClientId é obrigatório para recursos de rastreabilidade');
+      throw new ForbiddenException(
+        'ClientId é obrigatório para recursos de rastreabilidade',
+      );
     }
 
     try {
       const limits = await this.limitsService.getClientLimits(user.clientId);
-      
+
       if (!limits[requiredFeature]) {
         const planName = this.getPlanNameForFeature(requiredFeature);
         throw new ForbiddenException(
           `Recurso ${requiredFeature} não está disponível no seu plano atual. ` +
-          `Este recurso está disponível no plano ${planName}.`
+            `Este recurso está disponível no plano ${planName}.`,
         );
       }
 
@@ -43,7 +50,9 @@ export class RastreabilidadeGuard implements CanActivate {
       if (error instanceof ForbiddenException) {
         throw error;
       }
-      throw new ForbiddenException('Erro ao verificar permissões de rastreabilidade');
+      throw new ForbiddenException(
+        'Erro ao verificar permissões de rastreabilidade',
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
@@ -10,6 +11,8 @@ import {
   BeforeUpdate,
 } from 'typeorm';
 import { Client } from './client.entity';
+import { ClientUserOperation } from './client-user-operation.entity';
+import * as bcrypt from 'bcrypt';
 
 export enum ClientUserRole {
   ADMIN = 'admin',
@@ -49,7 +52,11 @@ export class ClientUser {
   @Column({ type: 'enum', enum: ClientUserRole, default: ClientUserRole.ADMIN })
   role: ClientUserRole;
 
-  @Column({ type: 'enum', enum: ClientUserStatus, default: ClientUserStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: ClientUserStatus,
+    default: ClientUserStatus.PENDING,
+  })
   status: ClientUserStatus;
 
   @Column({ nullable: true, length: 500 })
@@ -64,7 +71,16 @@ export class ClientUser {
   @Column({ default: true })
   isActive: boolean;
 
-  @CreateDateColumn({ type: 'timestamp with time zone', default: () => 'CURRENT_TIMESTAMP' })
+  // ⭐ NOVO: Relacionamento com operações
+  @OneToMany(() => ClientUserOperation, (relation) => relation.clientUser, {
+    eager: true,
+  })
+  operations: ClientUserOperation[];
+
+  @CreateDateColumn({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
   @Column({ nullable: true, length: 255 })
@@ -73,7 +89,10 @@ export class ClientUser {
   @Column({ nullable: true, type: 'timestamp with time zone' })
   resetPasswordExpiresAt?: Date;
 
-  @UpdateDateColumn({ type: 'timestamp with time zone', default: () => 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({
+    type: 'timestamp with time zone',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date;
 
   @BeforeInsert()
@@ -88,17 +107,15 @@ export class ClientUser {
   }
 
   async hashPassword() {
-    // TODO: Implementar hash de senha
-    // if (this.password) {
-    //   this.password = await bcrypt.hash(this.password, 10);
-    // }
+    if (this.password) {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
   }
 
   async validatePassword(password: string): Promise<boolean> {
-    // TODO: Implementar validação de senha
-    // if (!this.password) return false;
-    // return bcrypt.compare(password, this.password);
-    return true;
+    if (!this.password) return false;
+    return bcrypt.compare(password, this.password);
   }
 
   isInviteExpired(): boolean {
@@ -107,9 +124,27 @@ export class ClientUser {
   }
 
   canAcceptInvite(): boolean {
-    return this.status === ClientUserStatus.PENDING && 
-           !this.isInviteExpired() && 
-           this.isActive;
+    return (
+      this.status === ClientUserStatus.PENDING &&
+      !this.isInviteExpired() &&
+      this.isActive
+    );
+  }
+
+  // ⭐ NOVO: Métodos helpers para operações
+  hasAccessToOperation(operationId: string): boolean {
+    // Se não tem operações específicas, tem acesso a todas
+    if (!this.operations || this.operations.length === 0) {
+      return true;
+    }
+    // Verificar se tem acesso à operação específica
+    return this.operations.some((op) => op.operationId === operationId);
+  }
+
+  getAllowedOperationIds(): string[] | null {
+    if (!this.operations || this.operations.length === 0) {
+      return null; // Acesso a todas
+    }
+    return this.operations.map((op) => op.operationId);
   }
 }
-

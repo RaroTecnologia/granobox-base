@@ -1,4 +1,11 @@
-import { IsString, IsEnum, IsOptional, IsBoolean, IsObject, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsBoolean,
+  IsObject,
+  IsUUID,
+} from 'class-validator';
 import { LabelType } from '../entities/template-association.entity';
 
 export class CreateTemplateAssociationDto {
@@ -22,7 +29,3 @@ export class CreateTemplateAssociationDto {
   @IsUUID()
   clientId: string;
 }
-
-
-
-

@@ -1,6 +1,6 @@
 import { SetMetadata } from '@nestjs/common';
 
-export type RastreabilidadeFeature = 
+export type RastreabilidadeFeature =
   | 'recebimentoQR'
   | 'porcionamento'
   | 'rastreabilidadeCompleta'
@@ -12,5 +12,6 @@ export type RastreabilidadeFeature =
 
 export const RASTREABILIDADE_FEATURE_KEY = 'rastreabilidadeFeature';
 
-export const RequireRastreabilidadeFeature = (feature: RastreabilidadeFeature) =>
-  SetMetadata(RASTREABILIDADE_FEATURE_KEY, feature);
+export const RequireRastreabilidadeFeature = (
+  feature: RastreabilidadeFeature,
+) => SetMetadata(RASTREABILIDADE_FEATURE_KEY, feature);

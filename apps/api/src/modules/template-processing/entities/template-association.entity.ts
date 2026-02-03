@@ -1,11 +1,19 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Client } from '../../clients/entities/client.entity';
 
 export enum LabelType {
   PRODUTO_MANIPULADO = 'produto_manipulado',
   PRODUTO_PRONTO = 'produto_pronto',
   RECEBIMENTO = 'recebimento',
-  ETIQUETA_VALIDADE = 'etiqueta_validade'
+  ETIQUETA_VALIDADE = 'etiqueta_validade',
 }
 
 @Entity('template_associations')
@@ -21,7 +29,7 @@ export class TemplateAssociation {
 
   @Column({
     type: 'enum',
-    enum: LabelType
+    enum: LabelType,
   })
   labelType: LabelType;
 
@@ -44,7 +52,3 @@ export class TemplateAssociation {
   @UpdateDateColumn()
   updatedAt: Date;
 }
-
-
-
-

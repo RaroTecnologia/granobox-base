@@ -1,12 +1,15 @@
-# Configuração do Easypanel para API do Granobox
+# Configuração OTIMIZADA do Easypanel para API do Granobox
 name: granobox-api
 services:
   - name: granobox-api
     image: 
       dockerfile: Dockerfile
       context: .
+      args:
+        - GIT_SHA=${GIT_SHA:-latest}
+        - CACHEBUST=${CACHEBUST:-$(date +%s)}
     domains:
-      - host: api.granobox.com.br  # Substitua pelo seu domínio
+      - host: api.granobox.com.br
     env:
       - name: NODE_ENV
         value: production
@@ -17,25 +20,65 @@ services:
       - name: JWT_SECRET
         value: ${JWT_SECRET}
       - name: JWT_EXPIRES_IN
-        value: 7d
+        value: ${JWT_EXPIRES_IN:-7d}
+      - name: JWT_REFRESH_SECRET
+        value: ${JWT_REFRESH_SECRET}
+      - name: JWT_REFRESH_EXPIRES_IN
+        value: ${JWT_REFRESH_EXPIRES_IN:-30d}
       - name: CORS_ORIGINS
         value: ${CORS_ORIGINS}
+      # Templates Engine (processamento de ZPL)
+      # Staging: https://engine-staging.granobox.com.br
+      # Produção: https://engine.granobox.com.br
+      - name: TEMPLATES_ENGINE_URL
+        value: ${TEMPLATES_ENGINE_URL:-https://engine-staging.granobox.com.br}
+      # WebSocket Service (separado)
+      - name: WS_SERVICE_URL
+        value: http://granobox-ws:8081
+      - name: WS_SERVICE_API_KEY
+        value: ${WS_SERVICE_API_KEY}
+      # Cloudflare R2 (Object Storage)
+      - name: R2_ENDPOINT
+        value: ${R2_ENDPOINT}
+      - name: R2_ACCESS_KEY_ID
+        value: ${R2_ACCESS_KEY_ID}
+      - name: R2_SECRET_ACCESS_KEY
+        value: ${R2_SECRET_ACCESS_KEY}
+      - name: R2_BUCKET_NAME
+        value: ${R2_BUCKET_NAME:-granobox}
+      - name: R2_PUBLIC_URL
+        value: ${R2_PUBLIC_URL:-https://releases.granobox.com.br}
     ports:
       - published: 80
         target: 3001
+      # ❌ REMOVIDO: porta 8080 desnecessária (WebSocket usa 3001)
     deploy:
       replicas: 1
       resources:
         limits:
-          memory: 512M
+          memory: 1G  # ✅ AUMENTADO: de 512M para 1G (Node.js + TypeScript)
+          cpus: '0.5'
         reservations:
-          memory: 256M
+          memory: 512M  # ✅ AUMENTADO: de 256M para 512M
+          cpus: '0.25'
+      # ✅ ESTRATÉGIA DE DEPLOY OTIMIZADA
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })"]
+      # ✅ CORRIGIDO: endpoint correto sem /api
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 15s  # ✅ REDUZIDO: de 40s para 15s (mais rápido)
 
   - name: granobox-db
     image: postgres:15-alpine
@@ -56,9 +99,15 @@ services:
       replicas: 1
       resources:
         limits:
-          memory: 256M
+          memory: 512M  # ✅ AUMENTADO: de 256M para 512M
+          cpus: '0.25'
         reservations:
-          memory: 128M
+          memory: 256M  # ✅ AUMENTADO: de 128M para 256M
+          cpus: '0.1'
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
 
 volumes:
   - name: granobox-db-data

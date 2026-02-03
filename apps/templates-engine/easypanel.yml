@@ -1,0 +1,55 @@
+# Configuração Easypanel para Granobox Templates Engine
+# Deploy em: engine-staging.granobox.com.br
+name: granobox-engine
+services:
+  - name: granobox-engine
+    image: 
+      dockerfile: Dockerfile
+      context: .
+      args:
+        - GIT_SHA=${GIT_SHA:-latest}
+        - CACHEBUST=${CACHEBUST:-$(date +%s)}
+    domains:
+      - host: engine-staging.granobox.com.br
+    env:
+      - name: NODE_ENV
+        value: production
+      - name: PORT
+        value: 3002
+      - name: API_URL
+        value: https://api.granobox.com.br
+      - name: CACHE_ENABLED
+        value: "true"
+      - name: CACHE_MAX_SIZE
+        value: "100"
+      # CORS - permitir API e control
+      - name: CORS_ORIGINS
+        value: "https://api.granobox.com.br,https://control.granobox.com.br,https://control-staging.granobox.com.br"
+    ports:
+      - published: 80
+        target: 3002
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (res) => { process.exit(res.statusCode < 500 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

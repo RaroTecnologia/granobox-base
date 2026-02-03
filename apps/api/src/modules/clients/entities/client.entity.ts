@@ -13,7 +13,7 @@ import { Operation } from '../../subscriptions/entities/operation.entity';
 
 export enum ClientType {
   INDIVIDUAL = 'individual', // Pessoa Física
-  BUSINESS = 'business',     // Pessoa Jurídica
+  BUSINESS = 'business', // Pessoa Jurídica
 }
 
 export enum ClientStatus {
@@ -30,6 +30,9 @@ export enum BusinessType {
   HOTEL = 'hotel',
   CONFECTIONERY = 'confectionery',
   SUPERMARKET = 'supermarket',
+  DOCERIA = 'doceria',
+  ACOUGUE = 'acougue',
+  SORVETERIA = 'sorveteria',
   OTHER = 'other',
 }
 
@@ -145,12 +148,32 @@ export class Client {
   @Column({ nullable: true, length: 100 })
   tagmentBrand?: string;
 
+  @Column({ nullable: true, length: 255 })
+  tagmentLogoUuid?: string;
+
   // Configuração de impressoras Tagment
   @Column({ nullable: true, length: 255 })
   tagmentPrinterValidadeId?: string;
 
   @Column({ nullable: true, length: 255 })
   tagmentPrinterRotuloId?: string;
+
+  // Fonte dos templates: tagment (API Tagment) | granobox (templates do Granobox)
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    default: 'tagment',
+  })
+  templateProvider?: 'tagment' | 'granobox';
+
+  // Feature flags
+  @Column({ type: 'boolean', default: false })
+  hasRotuloModule: boolean;
+
+  /** ID do cliente no Asaas (para cobranças) */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  asaasCustomerId?: string;
 
   @CreateDateColumn()
   createdAt: Date;
@@ -159,16 +182,16 @@ export class Client {
   updatedAt: Date;
 
   // Relacionamentos
-  @OneToMany(() => Equipment, equipment => equipment.client)
+  @OneToMany(() => Equipment, (equipment) => equipment.client)
   equipment: Equipment[];
 
-  @OneToMany(() => ClientUser, user => user.client)
+  @OneToMany(() => ClientUser, (user) => user.client)
   users: ClientUser[];
 
-  @OneToMany(() => Subscription, subscription => subscription.client)
+  @OneToMany(() => Subscription, (subscription) => subscription.client)
   subscriptions: Subscription[];
 
-  @OneToMany(() => Operation, operation => operation.client)
+  @OneToMany(() => Operation, (operation) => operation.client)
   operations: Operation[];
 
   // Relacionamentos com produtos (serão adicionados quando o módulo for importado)
@@ -184,4 +207,3 @@ export class Client {
   // @OneToMany(() => Invoice, invoice => invoice.client)
   // invoices: Invoice[];
 }
-

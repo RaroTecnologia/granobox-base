@@ -1,4 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  OneToMany,
+} from 'typeorm';
 import { Client } from '../../clients/entities/client.entity';
 import { Label } from '../../labels/entities/label.entity';
 import { ProductReceiptItem } from './product-receipt-item.entity';
@@ -34,6 +43,9 @@ export class ProductReceipt {
   @Column({ type: 'varchar', length: 18, nullable: true })
   supplierCnpj: string; // CNPJ do fornecedor
 
+  @Column({ type: 'uuid', nullable: true })
+  productId: string; // Referência ao produto cadastrado (opcional)
+
   @Column({ type: 'varchar', length: 200 })
   productName: string;
 
@@ -46,22 +58,28 @@ export class ProductReceipt {
   @Column({ type: 'varchar', length: 10, default: 'kg' })
   unit: string;
 
-  @Column({ type: 'date' })
-  productionDate: Date;
+  @Column({ type: 'date', nullable: true })
+  productionDate?: Date; // Opcional
 
   @Column({ type: 'date' })
-  validityDate: Date;
+  validityDate: Date; // Obrigatório
 
   @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   temperature: number; // Temperatura no recebimento
 
   @Column({ type: 'varchar', length: 50, nullable: true })
-  batchNumber: string; // Lote de fabricação do fornecedor
+  sif?: string; // Número do SIF
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  invoiceNumber?: string; // Número da nota fiscal
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  batchNumber: string; // Lote do produto
 
   @Column({
     type: 'enum',
     enum: ['pending', 'received', 'rejected', 'cancelled'],
-    default: 'pending'
+    default: 'pending',
   })
   status: ReceiptStatus;
 
@@ -84,6 +102,6 @@ export class ProductReceipt {
   updatedAt: Date;
 
   // Relacionamentos
-  @OneToMany(() => ProductReceiptItem, item => item.receipt)
+  @OneToMany(() => ProductReceiptItem, (item) => item.receipt)
   items: ProductReceiptItem[];
 }

@@ -1,8 +1,22 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { ProductReceipt } from './product-receipt.entity';
 import { Label } from '../../labels/entities/label.entity';
 
-export type ItemStatus = 'created' | 'labelled' | 'stored' | 'used' | 'expired' | 'discarded';
+export type ItemStatus =
+  | 'created'
+  | 'labelled'
+  | 'stored'
+  | 'used'
+  | 'expired'
+  | 'discarded';
 
 @Entity('product_receipt_items')
 export class ProductReceiptItem {
@@ -12,7 +26,9 @@ export class ProductReceiptItem {
   @Column('uuid')
   receiptId: string;
 
-  @ManyToOne(() => ProductReceipt, receipt => receipt.items, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ProductReceipt, (receipt) => receipt.items, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'receiptId' })
   receipt: ProductReceipt;
 
@@ -35,7 +51,7 @@ export class ProductReceiptItem {
   @Column({
     type: 'enum',
     enum: ['created', 'labelled', 'stored', 'used', 'expired', 'discarded'],
-    default: 'created'
+    default: 'created',
   })
   status: ItemStatus;
 

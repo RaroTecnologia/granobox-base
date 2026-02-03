@@ -11,6 +11,7 @@ import {
   Min,
   ValidateIf,
   Matches,
+  IsBoolean,
 } from 'class-validator';
 
 import { ClientType, BusinessType } from '../entities/client.entity';
@@ -31,10 +32,12 @@ export class CreateClientDto {
     required: false,
     example: 'João Silva Santos',
   })
-  @ValidateIf(o => o.clientType === ClientType.INDIVIDUAL)
+  @ValidateIf((o) => o.clientType === ClientType.INDIVIDUAL)
   @IsNotEmpty({ message: 'Nome completo é obrigatório para pessoa física' })
   @IsString({ message: 'Nome completo deve ser uma string' })
-  @MaxLength(255, { message: 'Nome completo deve ter no máximo 255 caracteres' })
+  @MaxLength(255, {
+    message: 'Nome completo deve ter no máximo 255 caracteres',
+  })
   fullName?: string;
 
   @ApiProperty({
@@ -42,7 +45,7 @@ export class CreateClientDto {
     required: false,
     example: '12345678901',
   })
-  @ValidateIf(o => o.clientType === ClientType.INDIVIDUAL)
+  @ValidateIf((o) => o.clientType === ClientType.INDIVIDUAL)
   @IsNotEmpty({ message: 'CPF é obrigatório para pessoa física' })
   @IsString({ message: 'CPF deve ser uma string' })
   @Matches(/^\d{11}$/, { message: 'CPF deve conter exatamente 11 dígitos' })
@@ -64,7 +67,9 @@ export class CreateClientDto {
   })
   @IsOptional()
   @IsString({ message: 'Nome fantasia deve ser uma string' })
-  @MaxLength(255, { message: 'Nome fantasia deve ter no máximo 255 caracteres' })
+  @MaxLength(255, {
+    message: 'Nome fantasia deve ter no máximo 255 caracteres',
+  })
   businessName?: string;
 
   // Campos para Pessoa Jurídica
@@ -84,7 +89,7 @@ export class CreateClientDto {
     required: false,
     example: '12345678000195',
   })
-  @ValidateIf(o => o.clientType === ClientType.BUSINESS)
+  @ValidateIf((o) => o.clientType === ClientType.BUSINESS)
   @IsNotEmpty({ message: 'CNPJ é obrigatório para pessoa jurídica' })
   @IsString({ message: 'CNPJ deve ser uma string' })
   @Matches(/^\d{14}$/, { message: 'CNPJ deve conter exatamente 14 dígitos' })
@@ -107,7 +112,9 @@ export class CreateClientDto {
   })
   @IsNotEmpty({ message: 'Nome do contato é obrigatório' })
   @IsString({ message: 'Nome do contato deve ser uma string' })
-  @MaxLength(255, { message: 'Nome do contato deve ter no máximo 255 caracteres' })
+  @MaxLength(255, {
+    message: 'Nome do contato deve ter no máximo 255 caracteres',
+  })
   contactName: string;
 
   @ApiProperty({
@@ -201,13 +208,15 @@ export class CreateClientDto {
   })
   @IsNotEmpty({ message: 'Estado é obrigatório' })
   @IsString({ message: 'Estado deve ser uma string' })
-  @Matches(/^[A-Z]{2}$/, { message: 'Estado deve ser uma UF válida (2 letras maiúsculas)' })
+  @Matches(/^[A-Z]{2}$/, {
+    message: 'Estado deve ser uma UF válida (2 letras maiúsculas)',
+  })
   state: string;
 
   // Termos Comerciais
   @ApiProperty({
     description: 'Mensalidade',
-    example: 99.90,
+    example: 99.9,
     default: 0,
   })
   @IsOptional()
@@ -217,7 +226,7 @@ export class CreateClientDto {
 
   @ApiProperty({
     description: 'Taxa de instalação',
-    example: 150.00,
+    example: 150.0,
     default: 0,
   })
   @IsOptional()
@@ -247,11 +256,14 @@ export class CreateClientDto {
   @ApiProperty({
     description: 'API Key do Tagment para integração de impressão',
     required: false,
-    example: 'tgm_7bf097a437f821a8219ecd09b375ca6900d012cbf45bb916d18ddc0253c8bda7',
+    example:
+      'tgm_7bf097a437f821a8219ecd09b375ca6900d012cbf45bb916d18ddc0253c8bda7',
   })
   @IsOptional()
   @IsString({ message: 'API Key do Tagment deve ser uma string' })
-  @MaxLength(255, { message: 'API Key do Tagment deve ter no máximo 255 caracteres' })
+  @MaxLength(255, {
+    message: 'API Key do Tagment deve ter no máximo 255 caracteres',
+  })
   tagmentApiKey?: string;
 
   @ApiProperty({
@@ -283,4 +295,35 @@ export class CreateClientDto {
   @IsString({ message: 'Marca deve ser uma string' })
   @MaxLength(100, { message: 'Marca deve ter no máximo 100 caracteres' })
   tagmentBrand?: string;
+
+  @ApiProperty({
+    description: 'UUID do logo do cliente para impressão',
+    required: false,
+    example: '7b3de5c2-8a0f-4f9a-b6d1-4a2a3b1c9f0e',
+  })
+  @IsOptional()
+  @IsString({ message: 'UUID do logo deve ser uma string' })
+  @MaxLength(255, { message: 'UUID do logo deve ter no máximo 255 caracteres' })
+  tagmentLogoUuid?: string;
+
+  @ApiProperty({
+    description: 'Fonte dos templates: tagment (API Tagment) | granobox (templates do Granobox)',
+    required: false,
+    example: 'tagment',
+    enum: ['tagment', 'granobox'],
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  templateProvider?: 'tagment' | 'granobox';
+
+  @ApiProperty({
+    description: 'Habilita ou desabilita o módulo de impressão de rótulos',
+    required: false,
+    example: false,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean({ message: 'hasRotuloModule deve ser um valor booleano' })
+  hasRotuloModule?: boolean;
 }

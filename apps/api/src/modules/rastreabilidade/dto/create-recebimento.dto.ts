@@ -1,4 +1,13 @@
-import { IsString, IsNumber, IsDateString, IsOptional, IsEnum, IsPositive, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsDateString,
+  IsOptional,
+  IsEnum,
+  IsPositive,
+  IsBoolean,
+  Min,
+} from 'class-validator';
 
 export class CreateRecebimentoDto {
   @IsOptional()
@@ -9,12 +18,17 @@ export class CreateRecebimentoDto {
   @IsString()
   supplierCode?: string;
 
+  @IsOptional()
   @IsString()
-  supplierName: string;
+  supplierName?: string; // Opcional - pode ser removido no futuro
 
   @IsOptional()
   @IsString()
   supplierCnpj?: string;
+
+  @IsOptional()
+  @IsString()
+  productId?: string; // UUID do produto cadastrado (opcional)
 
   @IsString()
   productName: string;
@@ -29,17 +43,22 @@ export class CreateRecebimentoDto {
 
   @IsString()
   @IsOptional()
-  unit?: string = 'kg';
+  unit?: string = 'UN';
+
+  @IsOptional()
+  @IsDateString()
+  productionDate?: string; // Opcional
 
   @IsDateString()
-  productionDate: string;
-
-  @IsDateString()
-  validityDate: string;
+  validityDate: string; // Obrigatório
 
   @IsOptional()
   @IsNumber()
   temperature?: number;
+
+  @IsOptional()
+  @IsString()
+  sif?: string; // Número do SIF
 
   @IsOptional()
   @IsString()
@@ -59,5 +78,6 @@ export class CreateRecebimentoDto {
   itemQuantity?: number; // Quantidade por item/etiqueta
 
   @IsOptional()
+  @IsBoolean()
   generateLabels?: boolean; // Se deve gerar etiquetas imediatamente
 }
