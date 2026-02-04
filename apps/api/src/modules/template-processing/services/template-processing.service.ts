@@ -12,6 +12,7 @@ import { UpdateTemplateAssociationDto } from '../dto/update-template-association
 import { Product } from '../../products/entities/product.entity';
 import { Category } from '../../products/entities/category.entity';
 import { Client } from '../../clients/entities/client.entity';
+import { Config } from '../../config/entities/config.entity';
 import { TemplatesService } from '../../templates/templates.service';
 import { TemplatesEngineProxyService } from '../../templates/templates-engine-proxy.service';
 
@@ -26,9 +27,6 @@ import { TemplatesEngineProxyService } from '../../templates/templates-engine-pr
 @Injectable()
 export class TemplateProcessingService {
   private readonly logger = new Logger(TemplateProcessingService.name);
-  
-  // Fallback para templates legados no Tagment
-  private readonly TAGMENT_API_URL = 'https://api.tagment.com.br/v1';
 
   constructor(
     @InjectRepository(TemplateAssociation)
@@ -39,6 +37,8 @@ export class TemplateProcessingService {
     private categoriesRepository: Repository<Category>,
     @InjectRepository(Client)
     private clientRepository: Repository<Client>,
+    @InjectRepository(Config)
+    private configRepository: Repository<Config>,
     private readonly templatesService: TemplatesService,
     private readonly templatesEngineProxy: TemplatesEngineProxyService,
   ) {}
@@ -111,28 +111,43 @@ export class TemplateProcessingService {
 
   // ==================== Default Templates ====================
 
+  /**
+   * Busca template padrão do cliente na tabela config (Granobox Studio)
+   * ⭐ Apenas templates do Granobox são suportados
+   */
   async getDefaultTemplate(
     clientId: string,
     labelType: string,
-  ): Promise<TemplateAssociation | null> {
+  ): Promise<{ templateId: string } | null> {
     // Mapeamento: Flutter usa 'validity', backend usa 'etiqueta_validade'
     const mappedLabelType = labelType === 'validity' ? 'etiqueta_validade' : labelType;
     
-    this.logger.debug(`Buscando template padrão: clientId=${clientId}, labelType=${mappedLabelType}`);
+    this.logger.debug(`Buscando template padrão Granobox: clientId=${clientId}, labelType=${mappedLabelType}`);
     
-    const association = await this.templateAssociationRepository.findOne({
-      where: {
-        clientId,
-        labelType: mappedLabelType as any,
-        isActive: true,
-      },
+    const config = await this.configRepository.findOne({
+      where: { clientId },
     });
-
-    if (association) {
-      this.logger.debug(`Template padrão encontrado: ${association.templateId}`);
+    
+    if (!config) {
+      this.logger.debug(`Config não encontrada para cliente ${clientId}`);
+      return null;
     }
-
-    return association;
+    
+    let templateId: string | null = null;
+    
+    if (mappedLabelType === 'etiqueta_validade' && config.defaultValidityTemplateId) {
+      templateId = config.defaultValidityTemplateId;
+    } else if (mappedLabelType === 'etiqueta_rotulo' && config.defaultRotuloTemplateId) {
+      templateId = config.defaultRotuloTemplateId;
+    }
+    
+    if (templateId) {
+      this.logger.debug(`Template padrão encontrado: ${templateId}`);
+      return { templateId };
+    }
+    
+    this.logger.debug(`Nenhum template padrão configurado para ${mappedLabelType}`);
+    return null;
   }
 
   async setDefaultTemplate(
@@ -224,37 +239,33 @@ export class TemplateProcessingService {
    * Processa template e retorna ZPL formatado
    * 
    * Busca template do banco local (studio_templates) e processa via templates-engine.
-   * Fallback para Tagment externo se não encontrar localmente.
+   * ⭐ Apenas templates do Granobox são suportados (Tagment removido).
    */
   async processTemplate(
     templateId: string,
     variables: Record<string, any>,
     clientId: string,
   ): Promise<string> {
-    this.logger.log(`Processando template: ${templateId}`);
+    this.logger.log(`Processando template Granobox: ${templateId}`);
 
     try {
-      // 1. Tentar buscar template do banco local
-      let localTemplate: any = null;
-      try {
-        localTemplate = await this.templatesService.findOne(templateId, clientId, true);
-        this.logger.log(`Template local encontrado: ${localTemplate.name} (${localTemplate.templateType})`);
-      } catch (err) {
-        this.logger.log(`Template não encontrado localmente, tentando fallback...`);
-      }
-
-      // 2. Se encontrou localmente, processar via templates-engine
-      if (localTemplate) {
-        return await this.processLocalTemplate(localTemplate, variables);
-      }
-
-      // 3. Fallback: Tagment externo (compatibilidade com templates legados)
-      return await this.processViaTagmentFallback(templateId, variables, clientId);
+      // Buscar template do banco local (Granobox Studio)
+      const template = await this.templatesService.findOne(templateId, clientId, true);
+      this.logger.log(`Template encontrado: ${template.name} (${template.templateType})`);
+      
+      // Processar via templates-engine
+      return await this.processLocalTemplate(template, variables);
 
     } catch (error) {
       this.logger.error(`Erro ao processar template: ${error.message}`);
       
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException(
+          `Template ${templateId} não encontrado. Certifique-se de que o template existe no Granobox Studio.`,
+        );
+      }
+      
+      if (error instanceof BadRequestException) {
         throw error;
       }
       
@@ -339,68 +350,5 @@ export class TemplateProcessingService {
     }
 
     throw new BadRequestException(`Tipo de template desconhecido: ${templateType}`);
-  }
-
-  /**
-   * Fallback: Processa via Tagment externo (compatibilidade com templates legados)
-   */
-  private async processViaTagmentFallback(
-    templateId: string,
-    variables: Record<string, any>,
-    clientId: string,
-  ): Promise<string> {
-    this.logger.log(`Usando fallback Tagment para template legado...`);
-
-    const client = await this.clientRepository.findOne({
-      where: { id: clientId },
-    });
-
-    if (!client) {
-      throw new NotFoundException('Cliente não encontrado');
-    }
-
-    if (!client.tagmentApiKey) {
-      throw new BadRequestException(
-        'Template não encontrado localmente e cliente não possui API Key para fallback',
-      );
-    }
-
-    const url = `${this.TAGMENT_API_URL}/templates/process`;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${client.tagmentApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        template: templateId,
-        data: variables,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      this.logger.error(`Erro no fallback Tagment: ${errorText}`);
-      
-      if (response.status === 404) {
-        throw new NotFoundException(`Template ${templateId} não encontrado`);
-      } else if (response.status === 401) {
-        throw new BadRequestException('API Key inválida');
-      } else {
-        throw new BadRequestException(`Erro ao processar template: ${response.statusText}`);
-      }
-    }
-
-    const result = await response.json();
-    const zpl = (result as { zpl?: string; zplCode?: string }).zpl ?? 
-                (result as { zpl?: string; zplCode?: string }).zplCode;
-
-    if (!zpl) {
-      throw new BadRequestException('Resposta do fallback não contém ZPL');
-    }
-
-    this.logger.log(`ZPL gerado via fallback (${zpl.length} bytes)`);
-    return zpl;
   }
 }

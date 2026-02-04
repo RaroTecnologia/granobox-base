@@ -42,18 +42,31 @@ import { MaintenanceFormModal } from '../../components/modals/MaintenanceFormMod
 import { ClientPlanManager } from '../../components/ClientPlanManager';
 import { PlanLimits } from '../../components/PlanLimits';
 import { EdgeGoAvailabilityChart } from '../../components/EdgeGoAvailabilityChart';
-import { LabelOrdersTab } from '../../components/LabelOrdersTab';
-import { LabelOrdersDashboard } from '../../components/LabelOrdersDashboard';
+import { PrintConfigForm } from '../../components/forms/PrintConfigForm';
+import { ClientPublicTemplatesForm } from '../../components/forms/ClientPublicTemplatesForm';
 import { useCreateMaintenance } from '../../hooks/useMaintenance';
 import type { ApiClient, ApiContact, CreateContactRequest, ApiEquipment } from '../../types/api';
 
-type TabType = 'overview' | 'contacts' | 'equipment' | 'users' | 'operations' | 'tagment' | 'operators' | 'plans' | 'label-orders';
+type TabType = 'overview' | 'business' | 'people' | 'assets' | 'printing';
+
+type BusinessSubTab = 'plans';
+type PeopleSubTab = 'contacts' | 'users' | 'operators';
+type AssetsSubTab = 'equipment' | 'operations';
+type PrintingSubTab = 'config' | 'public-templates';
+
+const DEFAULT_SUB: Record<Exclude<TabType, 'overview'>, string> = {
+  business: 'plans',
+  people: 'contacts',
+  assets: 'equipment',
+  printing: 'config',
+};
 
 export function ClientDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [subTab, setSubTab] = useState<string>(DEFAULT_SUB.business);
   const [showContactForm, setShowContactForm] = useState(false);
   const [editingContact, setEditingContact] = useState<ApiContact | null>(null);
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
@@ -61,51 +74,50 @@ export function ClientDetails() {
   const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
   const [selectedEquipmentForMaintenance, setSelectedEquipmentForMaintenance] = useState<ApiEquipment | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [showTagmentConfigModal, setShowTagmentConfigModal] = useState(false);
-  const [showTagmentSuccessModal, setShowTagmentSuccessModal] = useState(false);
-  const [showTagmentErrorModal, setShowTagmentErrorModal] = useState(false);
-  const [tagmentApiKey, setTagmentApiKey] = useState('');
-  const [isValidatingApiKey, setIsValidatingApiKey] = useState(false);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [tagmentConfig, setTagmentConfig] = useState<any>(null);
-  const [configurationResult, setConfigurationResult] = useState<any>(null);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [tagmentPrinters, setTagmentPrinters] = useState<any[]>([]);
-  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
-  const [tagmentTemplates, setTagmentTemplates] = useState<any[]>([]);
-  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
-  const [defaultValidityTemplate, setDefaultValidityTemplate] = useState('');
   const [logoUuid, setLogoUuid] = useState('');
   const [granoboxPrinters, setGranoboxPrinters] = useState<any[]>([]);
   const [isLoadingGranoboxPrinters, setIsLoadingGranoboxPrinters] = useState(false);
 
-  // Função para obter a aba do hash da URL
-  const getTabFromHash = (): TabType => {
-    const hash = location.hash.replace('#', '');
-    const validTabs: TabType[] = ['overview', 'contacts', 'equipment', 'users', 'operations', 'tagment', 'operators', 'plans'];
-    return validTabs.includes(hash as TabType) ? (hash as TabType) : 'overview';
+  const validTabs: TabType[] = ['overview', 'business', 'people', 'assets', 'printing'];
+
+  const hashToMainAndSub = (hash: string): { tab: TabType; sub: string } => {
+    if (validTabs.includes(hash as TabType)) return { tab: hash as TabType, sub: hash === 'overview' ? subTab : DEFAULT_SUB[hash as Exclude<TabType, 'overview'>] };
+    const subToMain: Record<string, TabType> = {
+      plans: 'business',
+      contacts: 'people', users: 'people', operators: 'people',
+      equipment: 'assets', operations: 'assets',
+      'print-config': 'printing', config: 'printing', 'public-templates': 'printing',
+    };
+    const tab = subToMain[hash];
+    if (tab) return { tab, sub: hash === 'print-config' ? 'config' : hash };
+    return { tab: 'overview', sub: subTab };
   };
 
-  // Função para atualizar a aba e o hash da URL
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    // Atualizar o hash da URL sem recarregar a página
+    if (tab !== 'overview') setSubTab(DEFAULT_SUB[tab]);
     window.history.replaceState(null, '', `${location.pathname}#${tab}`);
   };
 
-  // Sincronizar aba com hash da URL na inicialização e mudanças de hash
+  const handleSubTabChange = (newSubTab: string) => {
+    setSubTab(newSubTab);
+  };
+
+  // Sincronizar aba e sub-aba com hash da URL
   useEffect(() => {
-    const tabFromHash = getTabFromHash();
-    setActiveTab(tabFromHash);
+    const hash = location.hash.replace('#', '');
+    const { tab, sub } = hashToMainAndSub(hash);
+    setActiveTab(tab);
+    if (tab !== 'overview') setSubTab(sub);
   }, [location.hash]);
 
-  // Listener para mudanças no hash (navegação do browser)
   useEffect(() => {
     const handleHashChange = () => {
-      const tabFromHash = getTabFromHash();
-      setActiveTab(tabFromHash);
+      const hash = location.hash.replace('#', '');
+      const { tab, sub } = hashToMainAndSub(hash);
+      setActiveTab(tab);
+      if (tab !== 'overview') setSubTab(sub);
     };
-
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
@@ -116,121 +128,24 @@ export function ClientDetails() {
   // Buscar operadores para exibir contagem
   const { data: operatorsForStats = [] } = useOperatorsByClient(id!);
 
-  // Carregar configuração Tagment salva
+  // Carregar impressoras do Granobox quando estiver na aba impressão
   useEffect(() => {
-    if (id) {
-      const savedConfig = localStorage.getItem(`tagment_config_${id}`);
-      if (savedConfig) {
-        try {
-          setTagmentConfig(JSON.parse(savedConfig));
-        } catch (error) {
-          console.error('Erro ao carregar configuração Tagment:', error);
-        }
-      }
-    }
-  }, [id]);
-
-  // Funções auxiliares para carregamento automático
-  const loadTagmentTemplates = async (apiKey: string) => {
-    setIsLoadingTemplates(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_TAGMENT_API_URL || 'https://api.tagment.com.br'}/v1/templates`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const templates = await response.json();
-        setTagmentTemplates(templates);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar templates:', error);
-    } finally {
-      setIsLoadingTemplates(false);
-    }
-  };
-
-  const loadTagmentPrinters = async (apiKey: string) => {
-    setIsLoadingPrinters(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_TAGMENT_API_URL || 'https://api.tagment.com.br'}/v1/printers`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (response.ok) {
-        const printers = await response.json();
-        setTagmentPrinters(printers);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar impressoras:', error);
-    } finally {
-      setIsLoadingPrinters(false);
-    }
-  };
-
-  // Carregar dados do Tagment automaticamente quando configuração estiver disponível
-  useEffect(() => {
-    if (tagmentConfig?.apiKey && activeTab === 'tagment') {
-      // Carregar templates e impressoras automaticamente
-      loadTagmentTemplates(tagmentConfig.apiKey);
-      loadTagmentPrinters(tagmentConfig.apiKey);
-    }
-  }, [tagmentConfig, activeTab]);
-
-  // Carregar impressoras do Granobox quando estiver na aba tagment
-  useEffect(() => {
-    if (activeTab === 'tagment' && id) {
+    if ((activeTab === 'printing') && id) {
       loadGranoboxPrinters();
     }
   }, [activeTab, id]);
 
-  // Carregar template padrão de validade quando estiver na aba tagment
+  // Carregar logo do cliente
   useEffect(() => {
-    const loadDefaultTemplate = async () => {
-    if (activeTab === 'tagment' && id) {
-        try {
-          const association = await templatesService.getDefaultTemplate(id, 'etiqueta_validade');
-          if (association?.templateId) {
-            setDefaultValidityTemplate(association.templateId);
-          }
-        } catch (error) {
-          console.error('Erro ao carregar template padrão:', error);
-    }
-      }
-    };
-    loadDefaultTemplate();
-  }, [activeTab, id]);
-
-  // Carregar logo do cliente quando estiver na aba tagment
-  useEffect(() => {
-    if (activeTab === 'tagment' && client?.tagmentLogoUuid) {
+    if (client?.tagmentLogoUuid) {
       setLogoUuid(client.tagmentLogoUuid);
     }
-  }, [activeTab, client?.tagmentLogoUuid]);
-
-  // Popular configuração Tagment a partir do cliente carregado
-  useEffect(() => {
-    if (client?.tagmentApiKey) {
-      const customerId = client.businessName
-        ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}`
-        : (id ? `gbx_client_${id}` : '');
-      setTagmentConfig({
-        customerId,
-        apiKey: client.tagmentApiKey,
-        isActive: true,
-        configuredAt: client.updatedAt || new Date().toISOString(),
-      });
-    }
-  }, [client, id]);
+  }, [client?.tagmentLogoUuid]);
 
   // Função para navegar para uma aba específica de forma programática
-  const navigateToTab = (tab: TabType) => {
+  const navigateToTab = (tab: TabType, sub?: string) => {
     handleTabChange(tab);
+    if (sub) setSubTab(sub);
     // Scroll suave para o topo das abas
     const tabsElement = document.querySelector('[data-tabs-container]');
     if (tabsElement) {
@@ -251,8 +166,14 @@ export function ClientDetails() {
   const toggleActiveContactMutation = useToggleActiveContact();
   const deleteContactMutation = useDeleteContact();
 
+  // Filtro por operação (equipamentos)
+  const [selectedOperationIdEquipment, setSelectedOperationIdEquipment] = useState<string | undefined>(undefined);
+  const { data: operationsForEquipment = [] } = useOperationsByClient(id!);
   // Hooks para equipamentos
-  const { data: equipment = [], isLoading: equipmentLoading } = useEquipmentByClient(id!);
+  const { data: equipment = [], isLoading: equipmentLoading } = useEquipmentByClient(
+    id!,
+    selectedOperationIdEquipment,
+  );
   const { data: equipmentStats } = useEquipmentStats(id!);
   const updateEquipmentMutation = useUpdateEquipment();
   
@@ -362,7 +283,7 @@ export function ClientDetails() {
   };
 
   // Funções para gerenciar equipamentos (comodato)
-  const handleCreateEquipmentLoan = async (data: { equipmentId: string; loanStartDate: string; loanEndDate?: string; location?: string; notes?: string }) => {
+  const handleCreateEquipmentLoan = async (data: { equipmentId: string; loanStartDate: string; loanEndDate?: string; location?: string; notes?: string; operationId?: string }) => {
     try {
       // Atualizar o equipamento para associá-lo ao cliente
       await updateEquipmentMutation.mutateAsync({
@@ -374,6 +295,7 @@ export function ClientDetails() {
           location: data.location,
           notes: data.notes,
           status: 'active', // Equipamento fica ativo quando emprestado
+          ...((data.operationId ?? selectedOperationIdEquipment) && { operationId: data.operationId ?? selectedOperationIdEquipment }),
         },
       });
       
@@ -385,7 +307,7 @@ export function ClientDetails() {
     }
   };
 
-  const handleUpdateEquipmentLoan = async (data: { equipmentId: string; loanStartDate: string; loanEndDate?: string; location?: string; notes?: string }) => {
+  const handleUpdateEquipmentLoan = async (data: { equipmentId: string; loanStartDate: string; loanEndDate?: string; location?: string; notes?: string; operationId?: string }) => {
     if (!editingEquipment) return;
 
     try {
@@ -396,6 +318,7 @@ export function ClientDetails() {
           loanEndDate: data.loanEndDate,
           location: data.location,
           notes: data.notes,
+          ...(data.operationId !== undefined && { operationId: data.operationId }),
         },
       });
       setEditingEquipment(null);
@@ -484,126 +407,6 @@ export function ClientDetails() {
     }
   };
 
-  // Função para copiar API Key
-  const handleCopyApiKey = async () => {
-    if (!tagmentConfig?.apiKey) return;
-    
-    try {
-      await navigator.clipboard.writeText(tagmentConfig.apiKey);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
-      console.error('Erro ao copiar API Key:', err);
-      // Fallback para navegadores mais antigos
-      const textArea = document.createElement('textarea');
-      textArea.value = tagmentConfig.apiKey;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    }
-  };
-
-  // Funções para Tagment
-  const handleConfigureTagmentApiKey = async () => {
-    if (!tagmentApiKey.trim()) {
-      setErrorMessage('Por favor, insira uma API Key válida');
-      setShowTagmentErrorModal(true);
-      return;
-    }
-
-    // Validação básica de formato
-    if (!tagmentApiKey.startsWith('tgm_') || tagmentApiKey.length < 10) {
-      setErrorMessage('Formato de API Key inválido. Deve começar com "tgm_" e ter pelo menos 10 caracteres.');
-      setShowTagmentErrorModal(true);
-      return;
-    }
-
-    setIsValidatingApiKey(true);
-    
-    try {
-      // Persistir no backend (clients.update) para que apps consumam via API
-      const customerId = client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : `gbx_client_${id}`;
-      if (!id) throw new Error('ID do cliente não encontrado');
-      await updateClientMutation.mutateAsync({
-        id: id as string,
-        // types não expõem tagmentCustomerId; usar any para enviar ambos
-        data: { tagmentApiKey: tagmentApiKey.trim(), tagmentCustomerId: customerId } as any,
-      });
-
-      // Atualizar estado local / exibir sucesso
-      const newConfig = {
-        customerId,
-        apiKey: tagmentApiKey.trim(),
-        isActive: true,
-        configuredAt: new Date().toISOString(),
-      };
-      setTagmentConfig(newConfig);
-      setConfigurationResult(newConfig);
-
-      setShowTagmentConfigModal(false);
-      setShowTagmentSuccessModal(true);
-      setTagmentApiKey('');
-
-      if (activeTab === 'tagment') {
-        loadTagmentTemplates(newConfig.apiKey);
-        loadTagmentPrinters(newConfig.apiKey);
-      }
-      
-    } catch (error) {
-      console.error('Erro ao configurar API Key:', error);
-      setErrorMessage('Erro inesperado ao configurar API Key. Tente novamente.');
-      setShowTagmentErrorModal(true);
-    } finally {
-      setIsValidatingApiKey(false);
-    }
-  };
-
-  const handleListTagmentPrinters = async () => {
-    if (!tagmentConfig?.apiKey) {
-      setErrorMessage('API Key não configurada');
-      setShowTagmentErrorModal(true);
-      return;
-    }
-
-    try {
-      await loadTagmentPrinters(tagmentConfig.apiKey);
-    } catch (error) {
-      setErrorMessage(`Erro ao conectar com Tagment: ${(error as Error).message}`);
-      setShowTagmentErrorModal(true);
-    }
-  };
-
-  const handleSyncTagmentTemplates = async () => {
-    if (!tagmentConfig?.apiKey) {
-      setErrorMessage('API Key não configurada');
-      setShowTagmentErrorModal(true);
-      return;
-    }
-
-    try {
-      await loadTagmentTemplates(tagmentConfig.apiKey);
-    } catch (error) {
-      setErrorMessage(`Erro ao sincronizar templates: ${(error as Error).message}`);
-      setShowTagmentErrorModal(true);
-    }
-  };
-
-  const handleSaveDefaultTemplate = async () => {
-    if (!id || !defaultValidityTemplate.trim()) return;
-    
-    try {
-      // Chamar API para salvar template padrão de validade
-      await templatesService.setDefaultTemplate(id, 'etiqueta_validade', defaultValidityTemplate.trim());
-      
-      alert('Template padrão de validade salvo com sucesso!');
-    } catch (error) {
-      console.error('Erro ao salvar template padrão:', error);
-      alert('Erro ao salvar template padrão. Tente novamente.');
-    }
-  };
 
   // Carregar impressoras do Granobox
   const loadGranoboxPrinters = async () => {
@@ -726,6 +529,12 @@ export function ClientDetails() {
         return 'Confeitaria';
       case 'supermarket':
         return 'Supermercado';
+      case 'doceria':
+        return 'Doceria';
+      case 'acougue':
+        return 'Açougue';
+      case 'sorveteria':
+        return 'Sorveteria';
       case 'other':
         return 'Outro';
       default:
@@ -733,64 +542,68 @@ export function ClientDetails() {
     }
   };
 
-  const tabs = [
+  const tabs: { id: TabType; label: string; icon: typeof User }[] = [
     { id: 'overview', label: 'Visão Geral', icon: User },
-    { id: 'plans', label: 'Planos', icon: Package },
-    { id: 'contacts', label: 'Contatos', icon: EnvelopeSimple },
-    { id: 'equipment', label: 'Equipamentos', icon: Wrench },
-    { id: 'users', label: 'Usuários', icon: Users },
-    { id: 'operations', label: 'Operações', icon: Wrench },
-    { id: 'operators', label: 'Operadores', icon: IdentificationCard },
-    { id: 'tagment', label: 'Tagment', icon: Printer },
-    { id: 'label-orders', label: 'Pedidos de Etiquetas', icon: Package },
+    { id: 'business', label: 'Negócio', icon: Package },
+    { id: 'people', label: 'Pessoas', icon: Users },
+    { id: 'assets', label: 'Ativos', icon: Wrench },
+    { id: 'printing', label: 'Impressão', icon: Printer },
+  ];
+
+  const businessSubTabs: { id: BusinessSubTab; label: string }[] = [
+    { id: 'plans', label: 'Planos' },
+  ];
+  const peopleSubTabs: { id: PeopleSubTab; label: string }[] = [
+    { id: 'contacts', label: 'Contatos' },
+    { id: 'users', label: 'Usuários' },
+    { id: 'operators', label: 'Operadores' },
+  ];
+  const assetsSubTabs: { id: AssetsSubTab; label: string }[] = [
+    { id: 'equipment', label: 'Equipamentos' },
+    { id: 'operations', label: 'Operações' },
+  ];
+  const printingSubTabs: { id: PrintingSubTab; label: string }[] = [
+    { id: 'config', label: 'Config. Impressão' },
+    { id: 'public-templates', label: 'Templates públicos' },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      {/* Sticky summary bar: sempre visível, alinhado ao topo do conteúdo */}
+      <div className="sticky top-0 z-10 -mx-page -mt-page flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-page py-4 shadow-erp">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate('/clients')}
-            className="h-8 w-8"
+            className="h-8 w-8 shrink-0"
+            title="Voltar para Clientes"
           >
             <ArrowLeft size={16} />
           </Button>
-          <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-lg ${client.clientType === 'business' ? 'bg-blue-100' : 'bg-green-100'}`}>
-              {client.clientType === 'business' ? (
-                <Building size={24} className="text-blue-600" />
-              ) : (
-                <User size={24} className="text-green-600" />
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-erp ${client.clientType === 'business' ? 'bg-blue-100 text-blue-600' : 'bg-primary-100 text-primary-600'}`}>
+            {client.clientType === 'business' ? <Building size={22} /> : <User size={22} />}
+          </div>
+          <div className="min-w-0">
+            <h1 className="truncate text-page-title text-gray-900">
+              {client.businessName || (client.clientType === 'individual' ? client.fullName : client.legalName)}
+            </h1>
+            <div className="mt-0.5 flex flex-wrap items-center gap-3">
+              {client.businessName && (client.clientType === 'individual' ? client.fullName : client.legalName) && (
+                <p className="text-sm text-gray-600">
+                  {client.clientType === 'individual' ? client.fullName : client.legalName}
+                </p>
               )}
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight">
-                {client.businessName || (client.clientType === 'individual' ? client.fullName : client.legalName)}
-              </h1>
-              <div className="flex items-center gap-4 mt-1">
-                {client.businessName && client.clientType === 'individual' && client.fullName && (
-                  <p className="text-gray-600">{client.fullName}</p>
-                )}
-                {client.businessName && client.clientType === 'business' && client.legalName && (
-                  <p className="text-gray-600">{client.legalName}</p>
-                )}
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
-                  {getStatusText(client.status)}
-                </span>
-                <span className="text-sm text-gray-500 font-mono">
-                  {client.clientType === 'individual' 
-                    ? (client.cpf ? formatCpf(client.cpf) : '') 
-                    : (client.cnpj ? formatCnpj(client.cnpj) : '')
-                  }
-                </span>
-              </div>
+              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(client.status)}`}>
+                {getStatusText(client.status)}
+              </span>
+              <span className="text-xs font-mono text-gray-500">
+                {client.clientType === 'individual' ? (client.cpf ? formatCpf(client.cpf) : '') : (client.cnpj ? formatCnpj(client.cnpj) : '')}
+              </span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button onClick={() => navigate(`/clients/${client.id}/edit`)}>
             <PencilSimple size={16} className="mr-2" />
             Editar Cliente
@@ -876,7 +689,7 @@ export function ClientDetails() {
 
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigateToTab('equipment')}
+          onClick={() => navigateToTab('assets', 'equipment')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -895,7 +708,7 @@ export function ClientDetails() {
 
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => navigateToTab('operators')}
+          onClick={() => navigateToTab('people', 'operators')}
         >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -913,12 +726,12 @@ export function ClientDetails() {
 
       {/* Tabs */}
       <div className="border-b border-gray-200 mt-8" data-tabs-container>
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex flex-wrap gap-1 sm:gap-4">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => handleTabChange(tab.id as TabType)}
-              className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm ${
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex items-center gap-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -931,8 +744,82 @@ export function ClientDetails() {
         </nav>
       </div>
 
+      {/* Sub-navegação quando a aba tem seções */}
+      {activeTab === 'business' && (
+        <div className="flex flex-wrap gap-2 pt-4">
+          {businessSubTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => handleSubTabChange(t.id)}
+              className={`rounded-erp px-3 py-1.5 text-sm font-medium transition-colors ${
+                subTab === t.id
+                  ? 'bg-primary-100 text-primary-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeTab === 'people' && (
+        <div className="flex flex-wrap gap-2 pt-4">
+          {peopleSubTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => handleSubTabChange(t.id)}
+              className={`rounded-erp px-3 py-1.5 text-sm font-medium transition-colors ${
+                subTab === t.id
+                  ? 'bg-primary-100 text-primary-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeTab === 'assets' && (
+        <div className="flex flex-wrap gap-2 pt-4">
+          {assetsSubTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => handleSubTabChange(t.id)}
+              className={`rounded-erp px-3 py-1.5 text-sm font-medium transition-colors ${
+                subTab === t.id
+                  ? 'bg-primary-100 text-primary-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {activeTab === 'printing' && (
+        <div className="flex flex-wrap gap-2 pt-4">
+          {printingSubTabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => handleSubTabChange(t.id)}
+              className={`rounded-erp px-3 py-1.5 text-sm font-medium transition-colors ${
+                subTab === t.id
+                  ? 'bg-primary-100 text-primary-800'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tab Content */}
-      {activeTab === 'plans' && client && (
+      {activeTab === 'business' && subTab === 'plans' && client && (
         <ClientPlanManager clientId={client.id} />
       )}
 
@@ -1049,8 +936,24 @@ export function ClientDetails() {
           {/* Gráfico de Disponibilidade Edge-Go */}
           <EdgeGoAvailabilityChart clientId={client.id} />
 
-          {/* Pedidos de Etiquetas - Dashboard */}
-          <LabelOrdersDashboard clientId={client.id} />
+          {/* Pedidos de suprimentos: link para a listagem central em Vendas */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Pedidos de suprimentos (etiquetas e ribbon)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Ver e gerenciar pedidos de etiquetas e ribbon deste cliente na listagem central.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/label-orders?clientId=${client.id}`)}
+              >
+                <Package size={16} className="mr-2" />
+                Ver listagem de pedidos
+              </Button>
+            </CardContent>
+          </Card>
 
           {/* Observações */}
           {client.notes && (
@@ -1066,7 +969,7 @@ export function ClientDetails() {
         </div>
       )}
 
-      {activeTab === 'contacts' && (
+      {activeTab === 'people' && subTab === 'contacts' && (
         <div className="space-y-6">
           {/* Formulário de contato */}
           {showContactForm && (
@@ -1236,7 +1139,7 @@ export function ClientDetails() {
         </div>
       )}
 
-      {activeTab === 'equipment' && (
+      {activeTab === 'assets' && subTab === 'equipment' && (
         <div className="space-y-6">
           {/* Formulário de equipamento */}
           {showEquipmentForm && (
@@ -1250,6 +1153,7 @@ export function ClientDetails() {
                 <EquipmentLoanForm
                   clientId={id!}
                   initialData={editingEquipment || undefined}
+                  operationId={selectedOperationIdEquipment}
                   onSubmit={editingEquipment ? handleUpdateEquipmentLoan : handleCreateEquipmentLoan}
                   onCancel={handleCancelEquipmentForm}
                   isSubmitting={updateEquipmentMutation.isPending}
@@ -1263,12 +1167,32 @@ export function ClientDetails() {
           {!showEquipmentForm && (
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                   <CardTitle>Equipamentos em Comodato</CardTitle>
-                  <Button onClick={() => setShowEquipmentForm(true)}>
-                    <Plus size={16} className="mr-2" />
-                    Associar Equipamento
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {operationsForEquipment.length > 0 && (
+                      <select
+                        value={selectedOperationIdEquipment ?? ''}
+                        onChange={(e) =>
+                          setSelectedOperationIdEquipment(
+                            e.target.value ? e.target.value : undefined,
+                          )
+                        }
+                        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Todas as operações</option>
+                        {operationsForEquipment.map((op) => (
+                          <option key={op.id} value={op.id}>
+                            {op.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <Button onClick={() => setShowEquipmentForm(true)}>
+                      <Plus size={16} className="mr-2" />
+                      Associar Equipamento
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
           <CardContent>
@@ -1443,7 +1367,7 @@ export function ClientDetails() {
         </div>
       )}
 
-      {activeTab === 'users' && (
+      {activeTab === 'people' && subTab === 'users' && (
         <div className="space-y-6">
           {/* Lista de usuários */}
           <ClientUsersList clientId={id!} />
@@ -1458,338 +1382,21 @@ export function ClientDetails() {
         </div>
       )}
 
-  {activeTab === 'operations' && (
+  {activeTab === 'assets' && subTab === 'operations' && (
     <OperationsTab clientId={id!} />
   )}
 
-      {activeTab === 'operators' && (
+      {activeTab === 'people' && subTab === 'operators' && (
         <OperatorsTab clientId={id!} />
       )}
 
-      {activeTab === 'label-orders' && id && (
-        <LabelOrdersTab clientId={id} />
+      {activeTab === 'printing' && subTab === 'config' && id && (
+        <PrintConfigForm clientId={id} />
       )}
 
-      {activeTab === 'tagment' && (
-        <div className="space-y-6">
-          {/* Configuração da API Key */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Configuração da API</CardTitle>
-              <p className="text-sm text-gray-600">
-                Configure a integração com a API Tagment para impressão de etiquetas
-              </p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Status da Integração */}
-                <div className="space-y-4">
-                  <h4 className="font-medium text-gray-900">Status da Integração</h4>
-                  <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${tagmentConfig ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-                    <span className="text-sm text-gray-600">
-                      {tagmentConfig ? 'Configurado' : 'Não configurado'}
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-500 space-y-1">
-                    <p>• Customer ID: {tagmentConfig?.customerId || (client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : 'Não definido')}</p>
-                    <div className="flex items-center gap-2">
-                      <p>• API Key: {tagmentConfig ? `${tagmentConfig.apiKey.substring(0, 10)}...` : 'Não configurada'}</p>
-                      {tagmentConfig && (
-                        <button
-                          onClick={handleCopyApiKey}
-                          className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                          title="Copiar API Key completa"
-                        >
-                          <Copy size={12} />
-                          {copySuccess ? 'Copiado!' : 'Copiar'}
-                        </button>
-                      )}
-                    </div>
-                    <p>• Status: {tagmentConfig ? 'Conectado' : 'Desconectado'}</p>
-                    <p>• Templates: {tagmentTemplates.length} disponível(is)</p>
-                    <p>• Impressoras: {tagmentPrinters.length} conectada(s)</p>
-                    {tagmentConfig && (
-                      <p>• Configurado em: {new Date(tagmentConfig.configuredAt).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Configuração */}
-                <div className="space-y-4">
-                  <h4 className="font-medium text-gray-900">Configuração</h4>
-                  <div className="space-y-2">
-                    <Button 
-                      onClick={() => setShowTagmentConfigModal(true)}
-                      className="w-full"
-                    >
-                      <Wrench size={16} className="mr-2" />
-                      Configurar API Key
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => {
-                        if (tagmentConfig) {
-                          alert(`Testando conexão com Tagment...\n\nCustomer ID: ${tagmentConfig.customerId}\nAPI Key: ${tagmentConfig.apiKey.substring(0, 10)}...`);
-                        }
-                      }}
-                      className="w-full"
-                      disabled={!tagmentConfig}
-                    >
-                      <Printer size={16} className="mr-2" />
-                      Testar Conexão
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Templates Tagment */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Templates de Impressão</CardTitle>
-              <p className="text-sm text-gray-600">
-                Templates Tagment associados para cada tipo de etiqueta
-              </p>
-            </CardHeader>
-            <CardContent>
-              {/* Configuração do Template Padrão de Validade */}
-              <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h4 className="font-medium text-green-900 mb-3">Template Padrão de Validade</h4>
-                <p className="text-sm text-green-800 mb-4">
-                  Configure o template padrão que será usado para etiquetas de validade quando o produto não tiver template customizado.
-                </p>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-green-900 mb-1">
-                      UUID do Template
-                    </label>
-                    <input
-                      type="text"
-                      value={defaultValidityTemplate}
-                      onChange={(e) => setDefaultValidityTemplate(e.target.value)}
-                      placeholder="Cole aqui o UUID do template de validade"
-                      className="w-full px-3 py-2 border border-green-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button 
-                      onClick={handleSaveDefaultTemplate}
-                      disabled={!defaultValidityTemplate.trim()}
-                      className="px-4 py-2"
-                    >
-                      Salvar
-                    </Button>
-                  </div>
-                </div>
-              {defaultValidityTemplate && (
-                  <div className="mt-3 p-2 bg-green-100 rounded text-xs text-green-800">
-                    <strong>Preview:</strong> {defaultValidityTemplate}
-                  </div>
-                )}
-              <div className="mt-6">
-                <h5 className="font-medium text-green-900 mb-2">Logo do Cliente</h5>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-green-900 mb-1">
-                      UUID do Logo
-                    </label>
-                    <input
-                      type="text"
-                      value={logoUuid}
-                      onChange={(e) => setLogoUuid(e.target.value)}
-                      placeholder="Cole aqui o UUID do logo do cliente"
-                      className="w-full px-3 py-2 border border-green-300 rounded-md text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <Button 
-                      onClick={handleSaveLogoUuid}
-                      disabled={!logoUuid.trim() || updateClientMutation.isPending}
-                      className="px-4 py-2"
-                    >
-                      Salvar
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              </div>
-
-              {isLoadingTemplates ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Sincronizando templates...</p>
-                </div>
-              ) : tagmentTemplates.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      {tagmentTemplates.length} template(s) disponível(is)
-                    </span>
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSyncTagmentTemplates}
-                    >
-                      Atualizar
-                    </Button>
-                  </div>
-                  
-                  <div className="grid gap-4">
-                    {tagmentTemplates.map((template) => (
-                      <div 
-                        key={template.id} 
-                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{template.name}</h4>
-                            <p className="text-sm text-gray-600">{template.description}</p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              ID: {template.id}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {template.type || 'Template'}
-                            </span>
-                            {template.size && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                {template.size.w}x{template.size.h} {template.size.unit}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <FileText size={48} className="mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {tagmentConfig ? 'Nenhum Template Encontrado' : 'Configure a API Key'}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {tagmentConfig ? 
-                      'Nenhum template foi encontrado na sua conta Tagment' : 
-                      'Configure a API Key primeiro para carregar os templates disponíveis'
-                    }
-                  </p>
-                  <Button 
-                    onClick={handleSyncTagmentTemplates}
-                    disabled={!tagmentConfig || isLoadingTemplates}
-                    className={!tagmentConfig ? "opacity-50" : ""}
-                  >
-                    <FileText size={16} className="mr-2" />
-                    {isLoadingTemplates ? 'Sincronizando...' : 'Sincronizar Templates'}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Impressoras Tagment */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Impressoras Conectadas</CardTitle>
-              <p className="text-sm text-gray-600">
-                Impressoras gerenciadas pelo Print Agent via Tagment
-              </p>
-            </CardHeader>
-            <CardContent>
-              {isLoadingPrinters ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Carregando impressoras...</p>
-                </div>
-              ) : tagmentPrinters.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      {tagmentPrinters.length} impressora(s) encontrada(s)
-                    </span>
-                    <Button 
-                      size="sm"
-                      variant="outline"
-                      onClick={handleListTagmentPrinters}
-                    >
-                      Atualizar
-                    </Button>
-                  </div>
-                  
-                  <div className="grid gap-4">
-                    {tagmentPrinters.map((printer) => (
-                      <div 
-                        key={printer.id} 
-                        className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <div className={`w-3 h-3 rounded-full ${
-                              printer.status === 'online' ? 'bg-green-500' : 
-                              printer.status === 'offline' ? 'bg-red-500' : 'bg-yellow-500'
-                            }`}></div>
-                            <div>
-                              <h4 className="font-medium text-gray-900">{printer.displayName}</h4>
-                              <p className="text-sm text-gray-600">
-                                {printer.externalLocationId && `Local: ${printer.externalLocationId} • `}
-                                Status: {printer.status}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right text-sm text-gray-500">
-                            <p>Hoje: {printer.printsToday || 0}</p>
-                            <p>Total: {printer.totalPrints || 0}</p>
-                          </div>
-                        </div>
-                        
-                        {printer.lastSeenAt && (
-                          <p className="text-xs text-gray-400 mt-2">
-                            Última atividade: {(() => {
-                              const dateStr = printer.lastSeenAt.toString();
-                              const date = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z');
-                              return date.toLocaleString('pt-BR', { 
-                                timeZone: 'America/Sao_Paulo',
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit'
-                              });
-                            })()}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Printer size={48} className="mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {tagmentConfig ? 'Nenhuma Impressora Conectada' : 'Configure a API Key'}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {tagmentConfig ? 
-                      'Nenhuma impressora foi encontrada para este cliente' : 
-                      'Configure a API Key e Print Agent para ver as impressoras'
-                    }
-                  </p>
-                  <Button 
-                    onClick={handleListTagmentPrinters}
-                    disabled={!tagmentConfig || isLoadingPrinters}
-                    className={!tagmentConfig ? "opacity-50" : ""}
-                  >
-                    <Printer size={16} className="mr-2" />
-                    {isLoadingPrinters ? 'Carregando...' : 'Listar Impressoras'}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+      {activeTab === 'printing' && subTab === 'public-templates' && id && (
+        <ClientPublicTemplatesForm clientId={id} />
+      )}
 
           {/* Impressoras Granobox (Edge-Go) */}
           <Card>
@@ -1906,152 +1513,6 @@ export function ClientDetails() {
       )}
 
 
-      {/* Modal de configuração Tagment */}
-      {showTagmentConfigModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Configurar API Key Tagment</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  API Key Tagment
-                </label>
-                <input
-                  type="text"
-                  value={tagmentApiKey}
-                  onChange={(e) => setTagmentApiKey(e.target.value)}
-                  placeholder="tgm_..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Formato: tgm_ seguido de 64 caracteres
-                </p>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <h4 className="text-sm font-medium text-blue-900 mb-1">Customer ID</h4>
-                <p className="text-sm text-blue-700">
-                  {client?.businessName ? `gbx_${client.businessName.toLowerCase().replace(/\s+/g, '_')}` : `gbx_client_${id}`}
-                </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Este será o ID usado no Tagment para identificar o cliente
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-4 pt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowTagmentConfigModal(false);
-                  setTagmentApiKey('');
-                }}
-                disabled={isValidatingApiKey}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleConfigureTagmentApiKey}
-                disabled={isValidatingApiKey || !tagmentApiKey.trim()}
-              >
-                {isValidatingApiKey ? 'Validando...' : 'Configurar'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de sucesso Tagment */}
-      {showTagmentSuccessModal && configurationResult && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              
-              <h2 className="text-xl font-semibold mb-2 text-gray-900">
-                API Key Configurada!
-              </h2>
-              
-              <p className="text-gray-600 mb-6">
-                A integração com Tagment foi configurada com sucesso.
-              </p>
-
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-4 text-left mb-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Detalhes da Configuração:</h4>
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p><strong>Customer ID:</strong> {configurationResult.customerId}</p>
-                  <p><strong>API Key:</strong> {configurationResult.apiKey.substring(0, 10)}...</p>
-                  <p><strong>Status:</strong> Ativo</p>
-                  <p><strong>Configurado em:</strong> {new Date(configurationResult.configuredAt).toLocaleString('pt-BR')}</p>
-                </div>
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-6">
-                <p className="text-sm text-blue-800">
-                  <strong>Próximos passos:</strong> Agora você pode sincronizar templates e listar impressoras conectadas.
-                </p>
-              </div>
-
-              <Button 
-                onClick={() => {
-                  setShowTagmentSuccessModal(false);
-                  setConfigurationResult(null);
-                }}
-                className="w-full"
-              >
-                Entendi
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de erro Tagment */}
-      {showTagmentErrorModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              
-              <h2 className="text-xl font-semibold mb-2 text-gray-900">
-                Erro na Configuração
-              </h2>
-              
-              <p className="text-gray-600 mb-6">
-                {errorMessage}
-              </p>
-
-              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-6">
-                <p className="text-sm text-yellow-800">
-                  <strong>Dica:</strong> Verifique se a API Key está no formato correto: tgm_seguido_de_64_caracteres
-                </p>
-              </div>
-
-              <Button 
-                onClick={() => {
-                  setShowTagmentErrorModal(false);
-                  setErrorMessage('');
-                }}
-                variant="outline"
-                className="w-full"
-              >
-                Tentar Novamente
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Modal de convite */}
       <SendInviteModal
         isOpen={showInviteModal}
@@ -2119,7 +1580,12 @@ function OperationsTab({ clientId }: { clientId: string }) {
 }
 
 function OperatorsTab({ clientId }: { clientId: string }) {
-  const { data: operators = [], isLoading, error } = useOperatorsByClient(clientId);
+  const { data: operations = [] } = useOperationsByClient(clientId);
+  const [selectedOperationId, setSelectedOperationId] = useState<string | undefined>(undefined);
+  const { data: operators = [], isLoading, error } = useOperatorsByClient(
+    clientId,
+    selectedOperationId,
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
@@ -2153,12 +1619,32 @@ function OperatorsTab({ clientId }: { clientId: string }) {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex justify-between items-center">
+          <div className="flex flex-wrap justify-between items-center gap-4">
             <CardTitle>Operadores do Cliente</CardTitle>
-            <Button onClick={() => { setEditing(null); setOpen(true); }}>
-              <Plus size={16} className="mr-2" />
-              Novo Operador
-            </Button>
+            <div className="flex items-center gap-2">
+              {operations.length > 0 && (
+                <select
+                  value={selectedOperationId ?? ''}
+                  onChange={(e) =>
+                    setSelectedOperationId(
+                      e.target.value ? e.target.value : undefined,
+                    )
+                  }
+                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                >
+                  <option value="">Todas as operações</option>
+                  {operations.map((op) => (
+                    <option key={op.id} value={op.id}>
+                      {op.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <Button onClick={() => { setEditing(null); setOpen(true); }}>
+                <Plus size={16} className="mr-2" />
+                Novo Operador
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -2224,7 +1710,8 @@ function OperatorsTab({ clientId }: { clientId: string }) {
         isOpen={open} 
         onClose={() => { setOpen(false); setEditing(null); }} 
         clientId={clientId} 
-        initial={editing} 
+        initial={editing}
+        operationId={selectedOperationId}
       />
     </div>
   );
