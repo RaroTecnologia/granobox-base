@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import * as sharp from 'sharp';
+import { rgbaToZ64 } from 'zpl-image';
 
 export interface ImageToZplOptions {
   widthMm?: number;
   heightMm?: number;
   dpi?: number;
+}
+
+export interface Z64Result {
+  z64: string;
+  totalBytes: number;
+  bytesPerRow: number;
+  width: number;
+  height: number;
 }
 
 export type ImageFit = 'contain' | 'cover' | 'fill';
@@ -134,6 +143,7 @@ export class ImageProcessorService {
   /**
    * Converte buffer raw (grayscale) em string hexadecimal para ^GFA.
    * ZPL espera bytes em hex: cada byte vira 2 caracteres hex.
+   * @deprecated Use prepareForZ64 para gerar Z64 comprimido (muito menor)
    */
   rawToHex(buffer: Buffer): string {
     return buffer.toString('hex').toUpperCase();
@@ -145,5 +155,105 @@ export class ImageProcessorService {
   base64ToBuffer(base64: string): Buffer {
     const base64Data = base64.replace(/^data:image\/\w+;base64,/, '');
     return Buffer.from(base64Data, 'base64');
+  }
+
+  /**
+   * Prepara imagem para ZPL usando formato Z64 comprimido.
+   * Retorna dados Z64 prontos para uso com ^GFA.
+   * 
+   * Z64 usa compressão zlib + base64, resultando em arquivos ~95% menores
+   * que o formato HEX tradicional.
+   * 
+   * IMPORTANTE: rgbaToZ64 espera dados RGBA (4 bytes/pixel).
+   * Usamos grayscale + conversão manual para RGBA (igual ao Tagment).
+   */
+  async prepareForZ64(
+    imageBuffer: Buffer,
+    options: ImageBoxOptions = {},
+  ): Promise<Z64Result> {
+    const { widthMm = 50, heightMm = 30, dpi = 203, fit = 'contain', align = 'center', offsetX = 0, offsetY = 0, scale = 100 } = options;
+    const widthPx = Math.round((widthMm / 25.4) * dpi);
+    const heightPx = Math.round((heightMm / 25.4) * dpi);
+    const scaleFactor = scale / 100;
+    const targetW = Math.max(1, Math.round(widthPx * scaleFactor));
+    const targetH = Math.max(1, Math.round(heightPx * scaleFactor));
+
+    // Função auxiliar para converter grayscale para RGBA
+    // rgbaToZ64 espera 4 bytes/pixel (RGBA), mas grayscale tem apenas 1 byte/pixel
+    const grayscaleToRgba = (grayBuffer: Buffer, width: number, height: number): Uint8Array => {
+      const rgbaArray = new Uint8Array(width * height * 4);
+      for (let i = 0; i < grayBuffer.length; i++) {
+        const value = grayBuffer[i];
+        rgbaArray[i * 4] = value;     // R
+        rgbaArray[i * 4 + 1] = value; // G
+        rgbaArray[i * 4 + 2] = value; // B
+        rgbaArray[i * 4 + 3] = 255;   // A (opaco)
+      }
+      return rgbaArray;
+    };
+
+    // Processar imagem com sharp - grayscale SEM ensureAlpha (1 canal apenas)
+    // NÃO usar .threshold() - a biblioteca zpl-image faz a conversão internamente
+    const grayBuffer = await sharp(imageBuffer)
+      .resize(targetW, targetH, {
+        fit: fit === 'cover' ? 'cover' : fit === 'fill' ? 'fill' : 'contain',
+        background: { r: 255, g: 255, b: 255 },
+      })
+      .grayscale()
+      .raw()
+      .toBuffer();
+
+    // Se contain e imagem menor que a caixa, criar canvas e centralizar
+    if (fit === 'contain' && (targetW < widthPx || targetH < heightPx)) {
+      // Criar canvas branco do tamanho da caixa (RGBA, depois converter para grayscale)
+      const canvasGray = await sharp({
+        create: {
+          width: widthPx,
+          height: heightPx,
+          channels: 4,
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        },
+      })
+        .composite([
+          {
+            input: await sharp(imageBuffer)
+              .resize(targetW, targetH, { fit: 'contain', background: { r: 255, g: 255, b: 255 } })
+              .toBuffer(),
+            left: align === 'left' ? 0 : align === 'right' ? widthPx - targetW : Math.floor((widthPx - targetW) / 2),
+            top: Math.floor((heightPx - targetH) / 2),
+          },
+        ])
+        .grayscale()
+        .raw()
+        .toBuffer();
+
+      // Converter grayscale para RGBA
+      const rgbaArray = grayscaleToRgba(canvasGray, widthPx, heightPx);
+
+      // Converter para Z64
+      const z64Result = rgbaToZ64(rgbaArray, widthPx, { notrim: true });
+
+      return {
+        z64: z64Result.z64,
+        totalBytes: z64Result.length,
+        bytesPerRow: z64Result.rowlen,
+        width: z64Result.width,
+        height: z64Result.height,
+      };
+    }
+
+    // Converter grayscale para RGBA
+    const rgbaArray = grayscaleToRgba(grayBuffer, targetW, targetH);
+
+    // Converter para Z64 usando zpl-image
+    const z64Result = rgbaToZ64(rgbaArray, targetW, { notrim: true });
+
+    return {
+      z64: z64Result.z64,
+      totalBytes: z64Result.length,
+      bytesPerRow: z64Result.rowlen,
+      width: z64Result.width,
+      height: z64Result.height,
+    };
   }
 }
