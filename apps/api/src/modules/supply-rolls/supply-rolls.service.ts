@@ -385,22 +385,22 @@ export class SupplyRollsService {
     }
 
     if (query.hasInvoice === 'true') {
-      qb.andWhere('roll."supplierInvoice" IS NOT NULL');
+      qb.andWhere('roll.supplierInvoice IS NOT NULL');
     } else if (query.hasInvoice === 'false') {
-      qb.andWhere('roll."supplierInvoice" IS NULL');
+      qb.andWhere('roll.supplierInvoice IS NULL');
     }
 
     if (query.batchCode) {
-      qb.andWhere('roll."batchCode" = :batchCode', {
+      qb.andWhere('roll.batchCode = :batchCode', {
         batchCode: query.batchCode,
       });
     }
 
     if (query.skuId) {
-      qb.andWhere('roll."skuId" = :skuId', { skuId: query.skuId });
+      qb.andWhere('roll.skuId = :skuId', { skuId: query.skuId });
     }
 
-    qb.orderBy('roll."createdAt"', 'DESC');
+    qb.orderBy('roll.createdAt', 'DESC');
 
     const limit = query.limit ? parseInt(query.limit, 10) : 100;
     const offset = query.offset ? parseInt(query.offset, 10) : 0;
