@@ -3,8 +3,8 @@ import { api } from './api';
 export interface SupplyRoll {
   id: string;
   shortCode: string | null;
-  type: 'LABEL' | 'RIBBON';
-  status: 'IN_STOCK' | 'ASSIGNED' | 'INSTALLED' | 'DEPLETED';
+  type: 'label' | 'ribbon';
+  status: 'in_stock' | 'assigned' | 'installed' | 'depleted';
   skuId: string;
   sku?: { id: string; name: string; code?: string; labelsPerRoll?: number };
   clientId?: string;
@@ -26,7 +26,7 @@ export interface SupplyRoll {
 
 export interface CreateBatchDto {
   skuId: string;
-  type: 'LABEL' | 'RIBBON';
+  type: 'label' | 'ribbon';
   quantity: number;
   batchCode?: string;
   clientId?: string;

@@ -26,7 +26,7 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
 
   // Form state
   const [selectedSkuId, setSelectedSkuId] = useState('');
-  const [rollType, setRollType] = useState<'LABEL' | 'RIBBON'>('LABEL');
+  const [rollType, setRollType] = useState<'label' | 'ribbon'>('label');
   const [quantity, setQuantity] = useState(10);
   const [batchCode, setBatchCode] = useState('');
 
@@ -102,7 +102,7 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
   const generateQrZpl = (rollsToExport: SupplyRoll[]) => {
     const zplCommands = rollsToExport.map((roll) => {
       const skuName = roll.sku?.name || 'SKU';
-      const typeLabel = roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon';
+      const typeLabel = roll.type === 'label' ? 'Etiqueta' : 'Ribbon';
       // Usar shortCode no QR (mais compacto) ou UUID como fallback
       const qrContent = roll.shortCode || roll.id;
       return [
@@ -118,7 +118,7 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
   };
 
   const handlePrintQrCodes = () => {
-    const inStockRolls = rolls.filter((r) => r.status === 'IN_STOCK');
+    const inStockRolls = rolls.filter((r) => r.status === 'in_stock');
     if (inStockRolls.length === 0) {
       toast.error('Nenhum rolo em estoque para imprimir QR');
       return;
@@ -142,17 +142,17 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
   };
 
   const statusColors: Record<string, string> = {
-    IN_STOCK: 'bg-blue-100 text-blue-700',
-    ASSIGNED: 'bg-yellow-100 text-yellow-700',
-    INSTALLED: 'bg-green-100 text-green-700',
-    DEPLETED: 'bg-gray-100 text-gray-500',
+    in_stock: 'bg-blue-100 text-blue-700',
+    assigned: 'bg-yellow-100 text-yellow-700',
+    installed: 'bg-green-100 text-green-700',
+    depleted: 'bg-gray-100 text-gray-500',
   };
 
   const statusLabels: Record<string, string> = {
-    IN_STOCK: 'Em estoque',
-    ASSIGNED: 'Atribuido',
-    INSTALLED: 'Instalado',
-    DEPLETED: 'Esgotado',
+    in_stock: 'Em estoque',
+    assigned: 'Atribuido',
+    installed: 'Instalado',
+    depleted: 'Esgotado',
   };
 
   return (
@@ -165,7 +165,7 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
             variant="outline"
             size="sm"
             onClick={handlePrintQrCodes}
-            disabled={rolls.filter((r) => r.status === 'IN_STOCK').length === 0}
+            disabled={rolls.filter((r) => r.status === 'in_stock').length === 0}
           >
             <QrCode size={16} className="mr-1" />
             Imprimir QR Codes
@@ -206,10 +206,10 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
                 <select
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   value={rollType}
-                  onChange={(e) => setRollType(e.target.value as 'LABEL' | 'RIBBON')}
+                  onChange={(e) => setRollType(e.target.value as 'label' | 'ribbon')}
                 >
-                  <option value="LABEL">Etiqueta</option>
-                  <option value="RIBBON">Ribbon</option>
+                  <option value="label">Etiqueta</option>
+                  <option value="ribbon">Ribbon</option>
                 </select>
               </div>
 
@@ -263,10 +263,10 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
           onChange={(e) => setFilterStatus(e.target.value)}
         >
           <option value="">Todos os status</option>
-          <option value="IN_STOCK">Em estoque</option>
-          <option value="ASSIGNED">Atribuidos</option>
-          <option value="INSTALLED">Instalados</option>
-          <option value="DEPLETED">Esgotados</option>
+          <option value="in_stock">Em estoque</option>
+          <option value="assigned">Atribuidos</option>
+          <option value="installed">Instalados</option>
+          <option value="depleted">Esgotados</option>
         </select>
         <span className="text-sm text-gray-500">{rolls.length} rolo(s)</span>
       </div>
@@ -299,7 +299,7 @@ export function SupplyRollsGenerator({ clientId }: SupplyRollsGeneratorProps) {
                     {roll.shortCode || roll.id.slice(0, 8) + '...'}
                   </td>
                   <td className="px-4 py-2 text-sm">
-                    {roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon'}
+                    {roll.type === 'label' ? 'Etiqueta' : 'Ribbon'}
                   </td>
                   <td className="px-4 py-2 text-sm">{roll.sku?.name || '-'}</td>
                   <td className="px-4 py-2 text-sm font-mono">{roll.batchCode}</td>

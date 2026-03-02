@@ -110,7 +110,7 @@ function GenerateTab() {
 
   // Form
   const [selectedSkuId, setSelectedSkuId] = useState('');
-  const [rollType, setRollType] = useState<'LABEL' | 'RIBBON'>('LABEL');
+  const [rollType, setRollType] = useState<'label' | 'ribbon'>('label');
   const [quantity, setQuantity] = useState(10);
   const [batchCode, setBatchCode] = useState('');
 
@@ -187,7 +187,7 @@ function GenerateTab() {
     return rollsToExport
       .map((roll) => {
         const skuName = roll.sku?.name || 'SKU';
-        const typeLabel = roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon';
+        const typeLabel = roll.type === 'label' ? 'Etiqueta' : 'Ribbon';
         const qrContent = roll.shortCode || roll.id;
         return [
           '^XA',
@@ -306,10 +306,10 @@ function GenerateTab() {
                 <select
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                   value={rollType}
-                  onChange={(e) => setRollType(e.target.value as 'LABEL' | 'RIBBON')}
+                  onChange={(e) => setRollType(e.target.value as 'label' | 'ribbon')}
                 >
-                  <option value="LABEL">Etiqueta</option>
-                  <option value="RIBBON">Ribbon</option>
+                  <option value="label">Etiqueta</option>
+                  <option value="ribbon">Ribbon</option>
                 </select>
               </div>
               <div>
@@ -396,7 +396,7 @@ function GenerateTab() {
                     {roll.shortCode || roll.id.slice(0, 8) + '...'}
                   </td>
                   <td className="px-4 py-2 text-sm">
-                    {roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon'}
+                    {roll.type === 'label' ? 'Etiqueta' : 'Ribbon'}
                   </td>
                   <td className="px-4 py-2 text-sm">{roll.sku?.name || '-'}</td>
                   <td className="px-4 py-2 text-sm font-mono">{roll.batchCode}</td>
@@ -633,7 +633,7 @@ function ReceiveTab() {
                     {roll.shortCode || roll.id.slice(0, 8) + '...'}
                   </td>
                   <td className="px-4 py-2 text-sm">
-                    {roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon'}
+                    {roll.type === 'label' ? 'Etiqueta' : 'Ribbon'}
                   </td>
                   <td className="px-4 py-2 text-sm">{roll.sku?.name || '-'}</td>
                   <td className="px-4 py-2 text-sm font-mono">{roll.batchCode}</td>
@@ -990,7 +990,7 @@ function AssignTab() {
                         {roll.shortCode || roll.id.slice(0, 8) + '...'}
                       </td>
                       <td className="px-4 py-2 text-sm">
-                        {roll.type === 'LABEL' ? 'Etiqueta' : 'Ribbon'}
+                        {roll.type === 'label' ? 'Etiqueta' : 'Ribbon'}
                       </td>
                       <td className="px-4 py-2 text-sm">{roll.sku?.name || '-'}</td>
                       <td className="px-4 py-2 text-sm font-mono">{roll.batchCode}</td>
