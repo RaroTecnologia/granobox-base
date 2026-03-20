@@ -8,9 +8,9 @@ import { labelsService } from '@/services/labelsService'
 import { SectionLoading, PageLoading } from '@/components/LoadingSpinner'
 import { ConfirmationModal } from '@/components/ConfirmationModal'
 import { toast } from 'react-hot-toast'
-import { 
-  Package, 
-  Warning, 
+import {
+  Package,
+  Warning,
   Plus,
   MagnifyingGlass,
   Eye,
@@ -20,7 +20,8 @@ import {
   CaretDown,
   TrayArrowDown,
   Spinner,
-  MapPin
+  MapPin,
+  UploadSimple
 } from '@phosphor-icons/react'
 import FooterNavigation from '@/components/FooterNavigation'
 import type { Category } from '@/services/categoriesService'
@@ -466,13 +467,25 @@ export default function CadastrosPage() {
 
             <div className="flex items-center space-x-3">
               <button
+                onClick={() => navigate('/cadastros/importacao')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors border ${
+                  theme === 'dark'
+                    ? 'border-primary text-primary hover:bg-primary/10'
+                    : 'border-primary text-primary hover:bg-primary/10'
+                }`}
+              >
+                <UploadSimple size={20} />
+                <span>Importar</span>
+              </button>
+
+              <button
                 onClick={() => navigate('/cadastro/categoria')}
                 className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <Plus size={20} />
                 <span>Categoria</span>
               </button>
-              
+
               <button
                 onClick={() => navigate('/cadastro/item')}
                 className="flex items-center space-x-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"

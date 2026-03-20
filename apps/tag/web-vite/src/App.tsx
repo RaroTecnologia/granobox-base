@@ -28,6 +28,7 @@ import PerfilPage from '@/app/PerfilPage'
 import RelatoriosPage from '@/app/RelatoriosPage'
 import RecebimentoPage from '@/app/RecebimentoPage'
 import CadastroLocaisPage from '@/app/CadastroLocaisPage'
+import ImportacaoProdutosPage from '@/app/ImportacaoProdutosPage'
 
 const router = createBrowserRouter([
   {
@@ -175,6 +176,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <CadastroLocaisPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/cadastros/importacao",
+    element: (
+      <ProtectedRoute>
+        <ImportacaoProdutosPage />
       </ProtectedRoute>
     ),
   },
