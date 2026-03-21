@@ -18,9 +18,6 @@ COPY postcss.config.cjs ./
 COPY eslint.config.js ./
 
 # Instalar dependências
-RUN npm ci --only=production --silent && npm cache clean --force
-
-# Instalar dependências de desenvolvimento para o build
 RUN npm ci --silent
 
 # Copiar código fonte
@@ -87,33 +84,12 @@ EOF
 # Copiar arquivos buildados do stage anterior
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Criar usuário não-root
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nextjs -u 1001 -G nodejs
-
-# Ajustar permissões
-RUN chown -R nextjs:nodejs /usr/share/nginx/html && \
-    chown -R nextjs:nodejs /var/cache/nginx && \
-    chown -R nextjs:nodejs /var/log/nginx && \
-    chown -R nextjs:nodejs /etc/nginx/conf.d
-
-# Criar diretórios necessários com permissões corretas
-RUN mkdir -p /var/cache/nginx/client_temp && \
-    mkdir -p /var/cache/nginx/proxy_temp && \
-    mkdir -p /var/cache/nginx/fastcgi_temp && \
-    mkdir -p /var/cache/nginx/uwsgi_temp && \
-    mkdir -p /var/cache/nginx/scgi_temp && \
-    chown -R nextjs:nodejs /var/cache/nginx
-
-# Usar usuário não-root
-USER nextjs
-
 # Expor porta
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+# Health check usando -q (BusyBox wget do Alpine não suporta --no-verbose)
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \
+    CMD wget -q --spider http://127.0.0.1/health || exit 1
 
 # Comando de inicialização
 CMD ["nginx", "-g", "daemon off;"]
